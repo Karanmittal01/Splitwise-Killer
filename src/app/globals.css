@@ -1,0 +1,247 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------ *
+ * Design tokens
+ * A calm, mint-forward palette: green means "coming to you", coral
+ * means "you owe". Everything else stays quiet so the numbers lead.
+ * ------------------------------------------------------------------ */
+@theme {
+  --color-mint-50: #eefaf6;
+  --color-mint-100: #d3f3e8;
+  --color-mint-200: #a9e7d3;
+  --color-mint-300: #74d5b8;
+  --color-mint-400: #40bd9a;
+  --color-mint-500: #1fa383;
+  --color-mint-600: #14846b;
+  --color-mint-700: #136957;
+  --color-mint-800: #135446;
+  --color-mint-900: #11453b;
+
+  --color-coral-50: #fff2ee;
+  --color-coral-100: #ffe1d8;
+  --color-coral-300: #ffab8f;
+  --color-coral-500: #f2643c;
+  --color-coral-600: #dd4a22;
+  --color-coral-700: #b73a19;
+
+  --color-ink-50: #f7f9f8;
+  --color-ink-100: #eef2f0;
+  --color-ink-200: #dfe6e3;
+  --color-ink-300: #c4d0cb;
+  --color-ink-400: #94a6a0;
+  --color-ink-500: #6b7f79;
+  --color-ink-600: #4d5f5a;
+  --color-ink-700: #384743;
+  --color-ink-800: #22302c;
+  --color-ink-900: #16211e;
+  --color-ink-950: #0d1614;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+
+  --radius-xl2: 1.25rem;
+}
+
+/* ------------------------------------------------------------------ *
+ * Semantic surface variables, swapped for dark mode
+ * ------------------------------------------------------------------ */
+:root {
+  --surface-page: var(--color-ink-50);
+  --surface-card: #ffffff;
+  --surface-raised: var(--color-ink-100);
+  --surface-border: var(--color-ink-200);
+  --text-strong: var(--color-ink-900);
+  --text-muted: var(--color-ink-500);
+  --brand: var(--color-mint-600);
+  --brand-soft: var(--color-mint-50);
+  --positive: var(--color-mint-600);
+  --negative: var(--color-coral-600);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface-page: var(--color-ink-950);
+    --surface-card: #131f1c;
+    --surface-raised: #1b2b27;
+    --surface-border: #24352f;
+    --text-strong: #eaf3ef;
+    --text-muted: #93a7a0;
+    --brand: var(--color-mint-300);
+    --brand-soft: #122a24;
+    --positive: var(--color-mint-300);
+    --negative: var(--color-coral-300);
+    color-scheme: dark;
+  }
+}
+
+* {
+  border-color: var(--surface-border);
+}
+
+html,
+body {
+  background: var(--surface-page);
+  color: var(--text-strong);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  min-height: 100dvh;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .animate-rise {
+    animation: rise 0.28s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Reusable pieces
+ * ------------------------------------------------------------------ */
+@utility card {
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: 1rem;
+}
+
+@utility muted {
+  color: var(--text-muted);
+}
+
+@utility positive {
+  color: var(--positive);
+}
+
+@utility negative {
+  color: var(--negative);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  padding: 0.625rem 1.1rem;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  line-height: 1.25rem;
+  transition:
+    transform 0.12s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    opacity 0.15s ease;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--color-mint-600);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-mint-700);
+}
+
+.btn-secondary {
+  background: var(--surface-card);
+  color: var(--text-strong);
+  border: 1px solid var(--surface-border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--surface-raised);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--surface-raised);
+  color: var(--text-strong);
+}
+
+.btn-danger {
+  background: var(--color-coral-600);
+  color: #fff;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--color-coral-700);
+}
+
+.field {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid var(--surface-border);
+  background: var(--surface-card);
+  padding: 0.625rem 0.875rem;
+  font-size: 0.9375rem;
+  color: var(--text-strong);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.field:focus {
+  border-color: var(--color-mint-400);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-mint-400) 22%, transparent);
+}
+
+.field::placeholder {
+  color: var(--color-ink-400);
+}
+
+.label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 0.375rem;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.78125rem;
+  font-weight: 600;
+  background: var(--surface-raised);
+  color: var(--text-muted);
+}
+
+.divide-row > * + * {
+  border-top: 1px solid var(--surface-border);
+}
+
+/* Keep long tables scrollable inside their card instead of the page. */
+.scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}

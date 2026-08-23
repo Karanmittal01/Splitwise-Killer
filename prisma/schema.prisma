@@ -1,0 +1,321 @@
+// Splitwise Killer — data model
+// Money is always stored as an integer number of minor units (e.g. cents/paise)
+// to avoid floating point drift. Every amount field is named `...Cents`.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// The connection URL lives in prisma.config.ts (Prisma 7 moved it out of the
+// schema); the app itself connects through the pg driver adapter in src/lib/db.ts.
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Auth.js models
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+
+  // App profile
+  phone           String?  @unique
+  defaultCurrency String   @default("INR")
+  // A placeholder is somebody who was added to a group/expense by email or
+  // phone but has never signed in. They own real balances; when they sign in
+  // with a matching Google account (or redeem an invite link) the placeholder
+  // is claimed and becomes a full account.
+  isPlaceholder   Boolean  @default(true)
+  createdById     String?
+  activitySeenAt  DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  accounts       Account[]
+  sessions       Session[]
+  memberships    GroupMember[]
+  shares         ExpenseShare[]
+  expensesAdded  Expense[]      @relation("ExpenseCreatedBy")
+  comments       Comment[]
+  activities     Activity[]     @relation("ActivityActor")
+  invitesSent    Invitation[]   @relation("InvitationInviter")
+  friendshipsA   Friendship[]   @relation("FriendshipUser")
+  friendshipsB   Friendship[]   @relation("FriendshipFriend")
+  groupsCreated  Group[]        @relation("GroupCreatedBy")
+
+  @@index([email])
+  @@index([phone])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ---------------------------------------------------------------------------
+// Groups & friends
+// ---------------------------------------------------------------------------
+
+enum GroupType {
+  TRIP
+  HOME
+  COUPLE
+  FRIENDS
+  OTHER
+}
+
+model Group {
+  id            String    @id @default(cuid())
+  name          String
+  type          GroupType @default(OTHER)
+  emoji         String    @default("🧾")
+  currency      String    @default("INR")
+  simplifyDebts Boolean   @default(false)
+  archived      Boolean   @default(false)
+  inviteToken   String    @unique @default(cuid())
+  createdById   String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  createdBy   User          @relation("GroupCreatedBy", fields: [createdById], references: [id])
+  members     GroupMember[]
+  expenses    Expense[]
+  activities  Activity[]
+  invitations Invitation[]
+
+  @@index([createdById])
+}
+
+model GroupMember {
+  id       String   @id @default(cuid())
+  groupId  String
+  userId   String
+  isAdmin  Boolean  @default(false)
+  joinedAt DateTime @default(now())
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([userId])
+}
+
+// Friendship is stored as two mirrored rows so lookups are a single index hit.
+model Friendship {
+  id        String   @id @default(cuid())
+  userId    String
+  friendId  String
+  createdAt DateTime @default(now())
+
+  user   User @relation("FriendshipUser", fields: [userId], references: [id], onDelete: Cascade)
+  friend User @relation("FriendshipFriend", fields: [friendId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, friendId])
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Expenses
+// ---------------------------------------------------------------------------
+
+enum SplitMethod {
+  EQUAL
+  EXACT
+  PERCENT
+  SHARES
+  ADJUSTMENT
+}
+
+enum Recurrence {
+  NONE
+  WEEKLY
+  FORTNIGHTLY
+  MONTHLY
+  YEARLY
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  groupId     String?
+  description String
+  amountCents Int
+  currency    String
+  date        DateTime @default(now())
+  category    String   @default("general")
+  notes       String?
+
+  // A settlement ("Alex paid Sam ₹500") is stored as an expense with
+  // isPayment = true so balances, activity and history share one code path.
+  isPayment   Boolean     @default(false)
+  splitMethod SplitMethod @default(EQUAL)
+
+  // Recurring expenses are materialised lazily whenever the owner loads the
+  // app, so no cron job / paid scheduler is required.
+  recurrence     Recurrence @default(NONE)
+  nextOccurrence DateTime?
+  recurringOfId  String?
+
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  group       Group?           @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy   User             @relation("ExpenseCreatedBy", fields: [createdById], references: [id])
+  shares      ExpenseShare[]
+  comments    Comment[]
+  activities  Activity[]
+  receipt     Receipt?
+  recurringOf Expense?         @relation("RecurringSeries", fields: [recurringOfId], references: [id], onDelete: SetNull)
+  instances   Expense[]        @relation("RecurringSeries")
+
+  @@index([groupId, date])
+  @@index([createdById])
+  @@index([recurrence, nextOccurrence])
+}
+
+// One row per participant per expense. `paidCents` is what they put in,
+// `owedCents` is what they consumed. Both can be non-zero for the same person.
+model ExpenseShare {
+  id        String @id @default(cuid())
+  expenseId String
+  userId    String
+  paidCents Int    @default(0)
+  owedCents Int    @default(0)
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([expenseId, userId])
+  @@index([userId])
+}
+
+model Receipt {
+  id        String   @id @default(cuid())
+  expenseId String   @unique
+  mimeType  String
+  size      Int
+  data      Bytes
+  createdAt DateTime @default(now())
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  expenseId String
+  userId    String
+  body      String
+  createdAt DateTime @default(now())
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expenseId])
+}
+
+// ---------------------------------------------------------------------------
+// Activity feed & invitations
+// ---------------------------------------------------------------------------
+
+enum ActivityType {
+  EXPENSE_ADDED
+  EXPENSE_UPDATED
+  EXPENSE_DELETED
+  PAYMENT_RECORDED
+  GROUP_CREATED
+  GROUP_MEMBER_ADDED
+  GROUP_MEMBER_LEFT
+  COMMENT_ADDED
+  FRIEND_ADDED
+}
+
+model Activity {
+  id        String       @id @default(cuid())
+  type      ActivityType
+  actorId   String
+  groupId   String?
+  expenseId String?
+  summary   String
+  detail    String?
+  createdAt DateTime     @default(now())
+
+  actor   User     @relation("ActivityActor", fields: [actorId], references: [id], onDelete: Cascade)
+  group   Group?   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  expense Expense? @relation(fields: [expenseId], references: [id], onDelete: SetNull)
+
+  audience ActivityAudience[]
+
+  @@index([createdAt])
+}
+
+// Fan-out table: who should see a given activity entry in their feed.
+model ActivityAudience {
+  id         String @id @default(cuid())
+  activityId String
+  userId     String
+
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@unique([activityId, userId])
+  @@index([userId])
+}
+
+model Invitation {
+  id          String    @id @default(cuid())
+  token       String    @unique @default(cuid())
+  email       String?
+  phone       String?
+  groupId     String?
+  invitedById String
+  // The placeholder account this invite hands over on redemption.
+  targetUserId String
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  group     Group? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  invitedBy User   @relation("InvitationInviter", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([phone])
+  @@index([targetUserId])
+}
