@@ -260,6 +260,14 @@ export function ExpenseForm({
               maxLength={120}
               required
             />
+            {/* Confirm what the description was read as, so the guess is
+                visible rather than a silent icon change. */}
+            {!catTouched && cat !== "general" && (
+              <p className="mt-1.5 text-xs muted">
+                Filed under {categoryById(cat).icon} {categoryById(cat).label} — tap the icon to
+                change.
+              </p>
+            )}
           </div>
         </div>
 

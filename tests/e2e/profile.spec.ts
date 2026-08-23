@@ -8,40 +8,22 @@ async function signIn(page: Page) {
   await page.waitForURL("**/dashboard");
 }
 
-// A real 64x48 PNG (non-square on purpose, so the centre-crop is exercised).
-const PNG = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAEAAAAAwCAIAAAAuKetIAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAfklEQVRoge2SAQkAURSDFudCrH8Kw1wMefyBAXQsfD1NdAMWUH1FdqHeJboBC6i+IrtQ7xLdgAVUX5FdqHeJbsACqq/ILtS7RDdgAdVXZBfqXaIbsIDqK7IL9S7RDVhA9RXZhXqX6AYsoPqK7EK9S3QDFlB9RXah3iW6AY8H/IyhAOIu9yXaAAAAAElFTkSuQmCC",
-  "base64",
-);
-
-test("upload, serve and remove a profile picture", async ({ page }) => {
+// Uploading itself is covered in cropper.spec.ts, which drives the crop
+// dialog end to end. This one guards the layout of the account page.
+test("the profile picture lives in the identity card, not its own section", async ({ page }) => {
   await signIn(page);
   await page.goto("/account");
 
-  // One card: the picture lives beside the name, not in a section of its own.
   await expect(page.getByRole("heading", { name: "Profile picture" })).toHaveCount(0);
-  await expect(page.getByLabel("Add a picture")).toBeVisible();
-  await page.setInputFiles("#avatar-input", {
-    name: "me.png",
-    mimeType: "image/png",
-    buffer: PNG,
-  });
 
-  await expect(page.getByText("Profile picture updated.")).toBeVisible();
+  // One card holding the avatar, the name, the email and the edit control.
+  const card = page.locator("div.card").filter({ hasText: "demo.alex@example.com" }).first();
+  await expect(card).toBeVisible();
+  await expect(card.getByLabel("Add a picture")).toBeVisible();
+  await expect(card.locator("#avatar-input")).toHaveCount(1);
 
-  // The stored picture is served back, and it is the shrunken JPEG.
-  await page.reload();
-  const avatar = page.locator('img[src^="/api/avatars/"]').first();
-  await expect(avatar).toBeVisible();
-  const src = await avatar.getAttribute("src");
-  expect(src).toContain("?v=");
-
-  const served = await page.request.get(src!);
-  expect(served.ok()).toBeTruthy();
-  expect(served.headers()["content-type"]).toBe("image/jpeg");
-
-  await page.getByRole("button", { name: "Remove" }).click();
-  await expect(page.getByText("Profile picture removed.")).toBeVisible();
+  // Exactly one avatar on the page for the signed-in person.
+  await expect(page.locator("#avatar-input")).toHaveCount(1);
 });
 
 test("the amount field gets the room, currency is just the symbol", async ({ page }) => {

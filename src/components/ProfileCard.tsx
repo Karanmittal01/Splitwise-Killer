@@ -3,45 +3,15 @@
 import { useRef, useState, useTransition } from "react";
 import { Avatar } from "./Avatar";
 import { FormMessage } from "./form";
+import { ImageCropper } from "./ImageCropper";
 import { removeAvatarAction, updateAvatarAction } from "@/server/actions/account";
 import { idleState, type ActionState } from "@/server/actions/types";
-
-const TARGET_PX = 256;
-
-/**
- * Shrink whatever came out of the camera roll to a square thumbnail before it
- * ever leaves the phone. A modern photo is several megabytes; this sends about
- * thirty kilobytes, which keeps uploads quick and the database small.
- */
-async function toSquareThumbnail(file: File): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
-  const side = Math.min(bitmap.width, bitmap.height);
-  const sx = (bitmap.width - side) / 2;
-  const sy = (bitmap.height - side) / 2;
-
-  const canvas = document.createElement("canvas");
-  canvas.width = TARGET_PX;
-  canvas.height = TARGET_PX;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Canvas is unavailable");
-
-  context.drawImage(bitmap, sx, sy, side, side, 0, 0, TARGET_PX, TARGET_PX);
-  bitmap.close?.();
-
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error("Could not read that image"))),
-      "image/jpeg",
-      0.85,
-    );
-  });
-}
 
 /**
  * Who you are, with the picture editable in place.
  *
- * The avatar itself is the upload button — tapping it (or the small control on
- * the right) opens the picker. One card, one copy of your face.
+ * Picking a file opens the cropper; only the square you choose is uploaded,
+ * already shrunk to 256px so a camera photo arrives as a few tens of kilobytes.
  */
 export function ProfileCard({
   userId,
@@ -55,6 +25,7 @@ export function ProfileCard({
   image: string | null;
 }) {
   const [state, setState] = useState<ActionState>(idleState);
+  const [picked, setPicked] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -63,24 +34,24 @@ export function ProfileCard({
     const file = event.target.files?.[0];
     if (!file) return;
     setState(idleState);
+    setPicked(file);
+  }
+
+  function clearInput() {
+    if (inputRef.current) inputRef.current.value = "";
+  }
+
+  function onCropped(blob: Blob) {
+    setPicked(null);
+    clearInput();
+    setPreview(URL.createObjectURL(blob));
 
     startTransition(async () => {
-      let thumbnail: Blob;
-      try {
-        thumbnail = await toSquareThumbnail(file);
-      } catch {
-        setState({ error: "That image couldn't be read. Try a different one.", ok: false });
-        return;
-      }
-
-      setPreview(URL.createObjectURL(thumbnail));
-
       const payload = new FormData();
-      payload.append("avatar", new File([thumbnail], "avatar.jpg", { type: "image/jpeg" }));
+      payload.append("avatar", new File([blob], "avatar.jpg", { type: "image/jpeg" }));
       const result = await updateAvatarAction(idleState, payload);
       setState(result);
       if (result.error) setPreview(null);
-      if (inputRef.current) inputRef.current.value = "";
     });
   }
 
@@ -153,6 +124,17 @@ export function ProfileCard({
       <div className="mt-3 empty:hidden">
         <FormMessage state={state} />
       </div>
+
+      {picked && (
+        <ImageCropper
+          file={picked}
+          onCancel={() => {
+            setPicked(null);
+            clearInput();
+          }}
+          onDone={onCropped}
+        />
+      )}
     </div>
   );
 }
