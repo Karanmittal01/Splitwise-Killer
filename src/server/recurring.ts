@@ -9,18 +9,39 @@ import { advance } from "@/lib/recurring";
  * scoped to the caller's own groups and is a no-op (one indexed query) when
  * nothing is due.
  */
+/**
+ * Per-instance throttle. Recurring bills are weekly at their most frequent, so
+ * checking once every 15 minutes per person is plenty — and it keeps a query
+ * off the critical path of every single page view.
+ */
+const lastChecked = new Map<string, number>();
+const CHECK_INTERVAL_MS = 15 * 60 * 1000;
+
 export async function materialiseRecurringExpenses(userId: string): Promise<number> {
   const now = new Date();
 
-  const due = await prisma.expense.findMany({
+  const previous = lastChecked.get(userId);
+  if (previous && now.getTime() - previous < CHECK_INTERVAL_MS) return 0;
+  lastChecked.set(userId, now.getTime());
+
+  // Two steps on purpose: the common case is "nothing is due", and asking for
+  // ids only keeps that case down to a single query. Pulling `shares` in one
+  // go would make Prisma issue a second, pointless query every time.
+  const dueIds = await prisma.expense.findMany({
     where: {
       deletedAt: null,
       recurrence: { not: "NONE" },
       nextOccurrence: { lte: now },
       shares: { some: { userId } },
     },
-    include: { shares: true },
+    select: { id: true },
     take: 50,
+  });
+  if (dueIds.length === 0) return 0;
+
+  const due = await prisma.expense.findMany({
+    where: { id: { in: dueIds.map((row) => row.id) } },
+    include: { shares: true },
   });
 
   let created = 0;

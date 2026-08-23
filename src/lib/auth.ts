@@ -39,11 +39,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       ]
     : [],
   callbacks: {
+    /**
+     * The adapter has already loaded the whole User row to build this session,
+     * so everything the app needs about the signed-in person is copied onto it
+     * here. That saves a second query for the same row on every request —
+     * which matters a lot when the database is a long way from the server.
+     */
     session({ session, user }) {
       if (session.user) {
+        const row = user as typeof user & {
+          phone?: string | null;
+          defaultCurrency?: string | null;
+          activitySeenAt?: Date | string | null;
+        };
         session.user.id = user.id;
-        session.user.defaultCurrency =
-          (user as { defaultCurrency?: string }).defaultCurrency ?? "INR";
+        session.user.phone = row.phone ?? null;
+        session.user.defaultCurrency = row.defaultCurrency ?? "INR";
+        session.user.activitySeenAt = row.activitySeenAt
+          ? new Date(row.activitySeenAt).toISOString()
+          : new Date(0).toISOString();
       }
       return session;
     },

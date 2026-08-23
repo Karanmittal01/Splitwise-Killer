@@ -5,6 +5,9 @@ declare module "next-auth" {
     user: {
       id: string;
       defaultCurrency: string;
+      phone: string | null;
+      /** ISO string — session data has to survive serialisation. */
+      activitySeenAt: string;
     } & DefaultSession["user"];
   }
 

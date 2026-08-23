@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { auth } from "./auth";
-import { prisma } from "./db";
 
 export type CurrentUser = {
   id: string;
@@ -13,24 +12,26 @@ export type CurrentUser = {
   activitySeenAt: Date;
 };
 
-/** The signed-in user, or null. Cached per request. */
+/**
+ * The signed-in user, or null. Cached per request.
+ *
+ * Everything here comes off the session, which the auth callback already
+ * populated from the User row it had to read anyway — so this costs no extra
+ * database round trip.
+ */
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const session = await auth();
   if (!session?.user?.id) return null;
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      image: true,
-      phone: true,
-      defaultCurrency: true,
-      activitySeenAt: true,
-    },
-  });
-  return user;
+  return {
+    id: session.user.id,
+    name: session.user.name ?? null,
+    email: session.user.email ?? null,
+    image: session.user.image ?? null,
+    phone: session.user.phone ?? null,
+    defaultCurrency: session.user.defaultCurrency || "INR",
+    activitySeenAt: new Date(session.user.activitySeenAt),
+  };
 });
 
 /** Same, but bounces to the login page when signed out. */
