@@ -6,6 +6,7 @@ import { Money } from "@/components/Money";
 import { SubmitButton } from "@/components/form";
 import { getFriendsWithBalances } from "@/lib/queries";
 import { displayName, requireUser } from "@/lib/session";
+import { ImportContacts } from "@/components/ImportContacts";
 import { addFriendAction } from "@/server/actions/friends";
 
 export const metadata = { title: "Friends" };
@@ -62,15 +63,15 @@ export default async function FriendsPage() {
           )}
         </div>
 
-        <aside>
+        <aside className="flex flex-col gap-4">
           <ActionForm action={addFriendAction} className="card p-4">
             <h2 className="mb-3 font-semibold">Add a friend</h2>
             <div className="flex flex-col gap-3">
               <div>
                 <label className="label" htmlFor="name">
-                  Their name (optional)
+                  Nickname (optional)
                 </label>
-                <input id="name" name="name" className="field" placeholder="Riya" maxLength={60} />
+                <input id="name" name="name" className="field" placeholder="Riya (only you see this)" maxLength={60} />
               </div>
               <div>
                 <label className="label" htmlFor="handle">
@@ -89,9 +90,12 @@ export default async function FriendsPage() {
               </SubmitButton>
             </div>
             <p className="mt-3 text-xs muted">
-              No account needed on their side yet — you can start splitting immediately.
+              No account needed on their side yet — they sign in with Google when they&apos;re
+              ready, and their share is waiting.
             </p>
           </ActionForm>
+
+          <ImportContacts />
         </aside>
       </div>
     </>

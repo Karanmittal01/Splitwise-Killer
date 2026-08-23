@@ -41,9 +41,14 @@ function relative(date: Date): string {
   return formatter.format(-Math.round(seconds / 31536000), "year");
 }
 
-export default async function ActivityPage() {
+export default async function ActivityPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
   const user = await requireUser();
-  const feed = await getActivityFeed(user.id);
+  const { q } = await searchParams;
+  const feed = await getActivityFeed(user.id, 60, q);
 
   // Opening the page clears the unread badge (the highlight below still uses
   // the timestamp we read before this write).
@@ -56,11 +61,35 @@ export default async function ActivityPage() {
     <>
       <PageHeader title="Activity" subtitle="Everything that's happened across your groups." />
 
+      <form className="mb-4 flex max-w-2xl flex-wrap items-center gap-2" action="/activity">
+        <div className="min-w-44 flex-1">
+          <input
+            name="q"
+            className="field"
+            placeholder="Search all activity…"
+            defaultValue={q ?? ""}
+            aria-label="Search activity"
+          />
+        </div>
+        <button type="submit" className="btn btn-secondary">
+          Search
+        </button>
+        {q && (
+          <Link href="/activity" className="btn btn-ghost">
+            Clear
+          </Link>
+        )}
+      </form>
+
       {feed.length === 0 ? (
         <EmptyState
-          icon="🔔"
-          title="Nothing yet"
-          body="As soon as you or your friends add expenses, it all shows up here."
+          icon={q ? "🔍" : "🔔"}
+          title={q ? "Nothing matches that" : "Nothing yet"}
+          body={
+            q
+              ? "Try a different word, or clear the search to see everything."
+              : "As soon as you or your friends add expenses, it all shows up here."
+          }
         />
       ) : (
         <div className="card divide-row max-w-2xl">

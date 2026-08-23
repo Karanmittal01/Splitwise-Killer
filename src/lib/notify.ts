@@ -79,3 +79,39 @@ export async function sendInviteEmail(params: {
       <p style="color:#8a9a94;font-size:13px">Or paste this link into your browser:<br>${link}</p>`),
   );
 }
+
+/** Where contact-form messages are emailed, when email is configured. */
+export const ownerEmail = process.env.OWNER_EMAIL ?? null;
+
+/** Donation link shown on the contact page — a UPI link, Ko-fi, anything. */
+export const donateUrl = process.env.DONATE_URL ?? null;
+
+export async function sendFeedbackEmail(params: {
+  name: string;
+  email: string | null;
+  message: string;
+}): Promise<boolean> {
+  if (!emailConfigured || !ownerEmail) return false;
+
+  return send(
+    ownerEmail,
+    `Splitwise Killer feedback from ${params.name}`,
+    shell(`<p style="font-size:15px;color:#26332e;line-height:1.6">
+        <strong>${escapeHtml(params.name)}</strong>${
+          params.email ? ` (${escapeHtml(params.email)})` : ""
+        } wrote:
+      </p>
+      <p style="white-space:pre-wrap;background:#f6f8f7;border-radius:12px;padding:14px;color:#26332e">${escapeHtml(
+        params.message,
+      )}</p>`),
+  );
+}
+
+/** Messages are written by people; never let them inject markup into the email. */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}

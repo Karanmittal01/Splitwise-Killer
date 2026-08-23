@@ -32,7 +32,9 @@ export function AppShell({
           <NavLink href="/groups" icon="👥" label="Groups" />
           <NavLink href="/friends" icon="🙋" label="Friends" />
           <NavLink href="/activity" icon="🔔" label="Activity" badge={unread} />
+          <NavLink href="/notes" icon="🗒️" label="Personal notes" />
           <NavLink href="/account" icon="⚙️" label="Account" />
+          <NavLink href="/contact" icon="💬" label="Contact" />
         </nav>
 
         {groups.length > 0 && (

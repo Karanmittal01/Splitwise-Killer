@@ -159,3 +159,92 @@ export async function quickAddPersonAction(input: {
     return { ok: false, error: "Could not add that person." };
   }
 }
+
+/** Set or clear a private nickname for a friend. */
+export async function setNicknameAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireUser();
+  const friendId = String(formData.get("friendId") ?? "");
+  const nickname = String(formData.get("nickname") ?? "").trim();
+
+  if (!friendId) return fail("Missing person.");
+  if (nickname.length > 60) return fail("Nicknames are limited to 60 characters.");
+
+  const friendship = await prisma.friendship.findUnique({
+    where: { userId_friendId: { userId: user.id, friendId } },
+    select: { id: true },
+  });
+  if (!friendship) return fail("They're not on your friends list.");
+
+  await prisma.friendship.update({
+    where: { id: friendship.id },
+    data: { nickname: nickname === "" ? null : nickname },
+  });
+
+  revalidatePath("/friends");
+  revalidatePath(`/friends/${friendId}`);
+  revalidatePath("/dashboard");
+  return succeed(nickname === "" ? "Nickname cleared." : "Nickname saved.");
+}
+
+export type ImportCandidate = { name: string; handle: string };
+
+/**
+ * Add several people at once from the phone's contact list.
+ *
+ * Everything goes through the same findOrCreatePerson path as adding one by
+ * hand, so numbers are canonicalised and anybody already known is matched
+ * rather than duplicated.
+ */
+export async function importContactsAction(
+  contacts: ImportCandidate[],
+): Promise<{ added: number; existing: number; failed: string[] }> {
+  const user = await requireUser();
+  const result = { added: 0, existing: 0, failed: [] as string[] };
+
+  for (const contact of contacts.slice(0, 100)) {
+    const handle = contact.handle.trim();
+    const email = normaliseEmail(handle);
+    const phone = email ? null : normalisePhone(handle);
+    if (!email && !phone) {
+      result.failed.push(contact.name || handle);
+      continue;
+    }
+
+    try {
+      const { user: person } = await findOrCreatePerson(
+        { name: contact.name?.trim() || null, email, phone },
+        user.id,
+      );
+      if (person.id === user.id) continue;
+
+      const already = await prisma.friendship.findUnique({
+        where: { userId_friendId: { userId: user.id, friendId: person.id } },
+        select: { id: true },
+      });
+      await ensureFriendship(user.id, person.id);
+      if (already) {
+        result.existing += 1;
+        continue;
+      }
+      result.added += 1;
+
+      if (person.isPlaceholder) {
+        const invite = await createInvitation({
+          targetUserId: person.id,
+          invitedById: user.id,
+          email,
+          phone,
+        });
+        if (email) await sendInviteEmail({ to: email, token: invite.token, inviterId: user.id });
+      }
+    } catch {
+      result.failed.push(contact.name || handle);
+    }
+  }
+
+  revalidatePath("/friends");
+  return result;
+}

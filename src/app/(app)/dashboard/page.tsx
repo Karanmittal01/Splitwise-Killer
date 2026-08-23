@@ -76,9 +76,6 @@ export default async function DashboardPage() {
                   <Avatar id={person.id} name={name} image={person.image} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium">{name}</p>
-                    {person.isPlaceholder && (
-                      <span className="text-xs muted">invited · hasn&apos;t signed in yet</span>
-                    )}
                   </div>
                   <div className="text-right">
                     {amounts.map((amount) => (

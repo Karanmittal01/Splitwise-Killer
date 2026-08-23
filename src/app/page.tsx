@@ -43,10 +43,10 @@ export default async function LandingPage() {
   return (
     <div className="mx-auto w-full max-w-5xl px-5 py-10 md:py-16">
       <header className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2">
           <BrandMark size={36} />
           <span className="text-lg font-bold tracking-tight">Splitwise Killer</span>
-        </div>
+        </Link>
         <Link href="/login" className="btn btn-secondary">
           Sign in
         </Link>

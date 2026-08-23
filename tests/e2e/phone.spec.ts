@@ -19,13 +19,13 @@ test("the same number typed differently is one person", async ({ page }) => {
   await signIn(page, owner);
 
   await page.goto("/friends");
-  await page.getByLabel("Their name (optional)").fill("Phone Person");
+  await page.getByLabel("Nickname (optional)").fill("Phone Person");
   await page.getByLabel("Email or mobile number").fill(local);
   await page.getByRole("button", { name: "Add friend" }).click();
   await expect(page.getByText(/was added/)).toBeVisible();
 
   // Same human, written the way somebody else would write it.
-  await page.getByLabel("Their name (optional)").fill("Phone Person Again");
+  await page.getByLabel("Nickname (optional)").fill("Phone Person Again");
   await page.getByLabel("Email or mobile number").fill(`+91 ${local.slice(0, 5)} ${local.slice(5)}`);
   await page.getByRole("button", { name: "Add friend" }).click();
   await expect(page.getByText(/is now on your friends list|was added/)).toBeVisible();
@@ -40,14 +40,14 @@ test("a mobile invite offers WhatsApp and SMS", async ({ page }) => {
   await page.locator("a[href^='/friends/']").first().click();
   await page.waitForURL(/\/friends\//);
 
-  const whatsapp = page.getByRole("link", { name: /WhatsApp/ });
+  const whatsapp = page.getByLabel(`WhatsApp +91${local}`);
   await expect(whatsapp).toBeVisible();
   const href = await whatsapp.getAttribute("href");
   // Addressed to that exact number, with the invite link in the message.
   expect(href).toContain(`wa.me/91${local}`);
   expect(decodeURIComponent(href ?? "")).toContain("/join/");
 
-  const sms = page.getByRole("link", { name: /Text message/ });
+  const sms = page.getByLabel("Send as a text message");
   await expect(sms).toBeVisible();
   expect(await sms.getAttribute("href")).toContain(`sms:+91${local}`);
 });

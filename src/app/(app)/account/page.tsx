@@ -1,11 +1,13 @@
 import { PageHeader } from "@/components/AppShell";
 import { ActionForm } from "@/components/ActionForm";
 import { ProfileCard } from "@/components/ProfileCard";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { SubmitButton } from "@/components/form";
 import { CURRENCIES } from "@/lib/currencies";
 import { signOut } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { displayName, requireUser } from "@/lib/session";
+import { getTheme } from "@/lib/theme";
 import { updateProfileAction } from "@/server/actions/account";
 
 export const metadata = { title: "Account" };
@@ -13,6 +15,7 @@ export const metadata = { title: "Account" };
 export default async function AccountPage() {
   const user = await requireUser();
 
+  const theme = await getTheme();
   const [groupCount, expenseCount, friendCount] = await Promise.all([
     prisma.groupMember.count({ where: { userId: user.id } }),
     prisma.expenseShare.count({ where: { userId: user.id, expense: { deletedAt: null } } }),
@@ -93,6 +96,14 @@ export default async function AccountPage() {
             <SubmitButton>Save profile</SubmitButton>
           </div>
         </ActionForm>
+
+        <section className="card p-4">
+          <h2 className="mb-1 font-semibold">Appearance</h2>
+          <p className="mb-3 text-sm muted">
+            Follow your device, or pin the app to light or dark.
+          </p>
+          <ThemeToggle current={theme} />
+        </section>
 
         <section className="card p-4">
           <h2 className="mb-1 font-semibold">Signed in with Google</h2>

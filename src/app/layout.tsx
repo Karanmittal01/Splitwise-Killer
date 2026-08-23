@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { getTheme } from "@/lib/theme";
 
 export const metadata: Metadata = {
   title: {
@@ -23,9 +24,12 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Stamped on the server so the first paint is already the right theme.
+  const theme = await getTheme();
+
   return (
-    <html lang="en">
+    <html lang="en" data-theme={theme === "system" ? undefined : theme}>
       <body>{children}</body>
     </html>
   );

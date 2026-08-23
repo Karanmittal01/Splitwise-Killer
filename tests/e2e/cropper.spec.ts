@@ -81,7 +81,8 @@ test("the crop is what gets uploaded", async ({ page }) => {
   expect(bytes).toBeGreaterThan(200);
   expect(bytes).toBeLessThan(200_000);
 
-  await page.getByRole("button", { name: "Remove" }).click();
+  await page.getByRole("button", { name: "Change or remove picture" }).click();
+  await page.getByRole("button", { name: "Remove picture", exact: true }).click();
   await expect(page.getByText("Profile picture removed.")).toBeVisible();
 });
 

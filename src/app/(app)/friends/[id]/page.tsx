@@ -3,17 +3,20 @@ import { notFound } from "next/navigation";
 import { EmptyState, PageHeader } from "@/components/AppShell";
 import { ActionForm } from "@/components/ActionForm";
 import { Avatar } from "@/components/Avatar";
-import { ShareInvite } from "@/components/ShareInvite";
 import { ExpenseList } from "@/components/ExpenseList";
 import { Money } from "@/components/Money";
+import { NicknameEditor } from "@/components/NicknameEditor";
+import { ShareInvite } from "@/components/ShareInvite";
+import { ShareTransactions, type ShareableExpense } from "@/components/ShareTransactions";
 import { SubmitButton } from "@/components/form";
 import { prisma } from "@/lib/db";
+import { formatMoney } from "@/lib/money";
 import { inviteLink } from "@/lib/people";
-import { getSharedExpenses, userPairBalances } from "@/lib/queries";
+import { getNicknames, getSharedExpenses, userPairBalances } from "@/lib/queries";
 import { displayName, requireUser } from "@/lib/session";
 import { removeFriendAction } from "@/server/actions/friends";
-import { resendInviteEmailAction } from "@/server/actions/invites";
-import { emailConfigured } from "@/lib/notify";
+
+const shortDate = new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short" });
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -32,17 +35,22 @@ export default async function FriendPage({ params }: { params: Promise<{ id: str
   });
   if (!person) notFound();
 
-  const [expenses, pairs, invite] = await Promise.all([
+  const [expenses, pairs, invite, nicknames] = await Promise.all([
     getSharedExpenses(user.id, person.id),
     userPairBalances(user.id),
     person.isPlaceholder
       ? prisma.invitation.findFirst({
           where: { targetUserId: person.id, acceptedAt: null },
           orderBy: { createdAt: "desc" },
-          select: { token: true, email: true, phone: true },
+          select: { token: true, email: true },
         })
       : Promise.resolve(null),
+    getNicknames(user.id),
   ]);
+
+  const nickname = nicknames.get(person.id) ?? null;
+  const realName = displayName(person);
+  const name = nickname ?? realName;
 
   const balances: { currency: string; netCents: number }[] = [];
   for (const [currency, bucket] of pairs) {
@@ -50,7 +58,29 @@ export default async function FriendPage({ params }: { params: Promise<{ id: str
     if (value) balances.push({ currency, netCents: value });
   }
 
-  const name = displayName(person);
+  const balanceLine =
+    balances.length === 0
+      ? "We're all settled up."
+      : balances
+          .map((b) =>
+            b.netCents > 0
+              ? `You are owed ${formatMoney(b.netCents, b.currency)}.`
+              : `You owe ${formatMoney(-b.netCents, b.currency)}.`,
+          )
+          .join(" ");
+
+  const shareable: ShareableExpense[] = expenses.map((expense) => {
+    const mine = expense.shares.find((s) => s.userId === user.id);
+    return {
+      id: expense.id,
+      description: expense.description,
+      date: shortDate.format(expense.date),
+      amountCents: expense.amountCents,
+      currency: expense.currency,
+      netCents: (mine?.paidCents ?? 0) - (mine?.owedCents ?? 0),
+      isPayment: expense.isPayment,
+    };
+  });
 
   return (
     <>
@@ -63,13 +93,19 @@ export default async function FriendPage({ params }: { params: Promise<{ id: str
           </span>
         }
         subtitle={
-          <>
+          <span className="flex flex-wrap items-center gap-x-2">
+            {nickname && <span>{realName} ·</span>}
             {person.email ?? person.phone ?? "no contact details"}
-            {person.isPlaceholder && " · invited, hasn't signed in yet"}
-          </>
+          </span>
         }
         action={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <ShareTransactions
+              expenses={shareable}
+              friendName={name}
+              friendPhone={person.phone}
+              balanceLine={balanceLine}
+            />
             <Link href={`/friends/${person.id}/settle`} className="btn btn-secondary">
               Settle up
             </Link>
@@ -95,28 +131,26 @@ export default async function FriendPage({ params }: { params: Promise<{ id: str
             ))}
           </div>
         )}
+        <div className="mt-1">
+          <NicknameEditor friendId={person.id} nickname={nickname} realName={realName} />
+        </div>
       </div>
 
       {person.isPlaceholder && invite && (
-        <div className="card mb-5 p-4">
-          <h2 className="mb-1 font-semibold">Invite {name}</h2>
-          <p className="mb-3 text-sm muted">
-            Send them this link. When they sign in with Google, everything you&apos;ve split with
-            them is already there.
-          </p>
+        <div className="card mb-5 flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">{name} hasn&apos;t signed in yet</p>
+            <p className="text-xs muted">
+              Send them this link — they sign in with Google and their share is already there.
+            </p>
+          </div>
           <ShareInvite
             link={inviteLink(invite.token)}
             name={name}
             phone={person.phone}
+            email={invite.email ?? person.email}
+            compact
           />
-          {emailConfigured && invite.email && (
-            <ActionForm action={resendInviteEmailAction} className="mt-3">
-              <input type="hidden" name="targetUserId" value={person.id} />
-              <SubmitButton className="btn btn-secondary text-sm" pendingLabel="Sending…">
-                ✉️ Email this invite to {invite.email}
-              </SubmitButton>
-            </ActionForm>
-          )}
         </div>
       )}
 
@@ -136,10 +170,7 @@ export default async function FriendPage({ params }: { params: Promise<{ id: str
       )}
 
       <div className="mt-8">
-        <ActionForm
-          action={removeFriendAction}
-          confirm={`Remove ${name} from your friends list?`}
-        >
+        <ActionForm action={removeFriendAction} confirm={`Remove ${name} from your friends list?`}>
           <input type="hidden" name="friendId" value={person.id} />
           <SubmitButton className="btn btn-ghost text-xs" pendingLabel="Removing…">
             Remove from friends

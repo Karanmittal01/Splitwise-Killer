@@ -66,13 +66,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     // A placeholder becomes a real account the moment its owner signs in.
     async signIn({ user, profile }) {
       if (!user.id) return;
+
+      const existing = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { isPlaceholder: true, name: true, image: true },
+      });
+
+      // Claiming a placeholder: whatever the inviter typed as a name, and the
+      // absence of a picture, are both replaced by the real Google profile.
+      // Afterwards their own choices win — a picture they uploaded here is
+      // never overwritten by Google on a later sign-in.
+      const claiming = existing?.isPlaceholder ?? true;
+      const googleName = (profile?.name as string | undefined) ?? user.name ?? undefined;
+      const googlePicture = (profile?.picture as string | undefined) ?? user.image ?? undefined;
+
       await prisma.user.update({
         where: { id: user.id },
         data: {
           isPlaceholder: false,
-          name: user.name ?? profile?.name ?? undefined,
-          image: user.image ?? (profile?.picture as string | undefined) ?? undefined,
           emailVerified: new Date(),
+          name: claiming ? googleName : (existing?.name ?? googleName),
+          image: claiming ? googlePicture : (existing?.image ?? googlePicture),
         },
       });
     },

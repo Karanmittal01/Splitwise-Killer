@@ -194,10 +194,10 @@ export default async function GroupSettingsPage({ params }: { params: Promise<{ 
                   {invite && (
                     <div className="w-full">
                       <ShareInvite
-                        label={`Invite link for ${displayName(member)}`}
                         link={inviteLink(invite.token)}
                         name={displayName(member)}
                         phone={member.phone}
+                        email={invite.email ?? member.email}
                       />
                       {emailConfigured && invite.email && (
                         <ActionForm action={resendInviteEmailAction} className="mt-2">

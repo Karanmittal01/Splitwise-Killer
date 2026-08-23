@@ -59,8 +59,12 @@
   color-scheme: light;
 }
 
+/* Dark palette, defined once and applied two ways: to anyone whose system
+   asks for dark (unless they've explicitly chosen light), and to anyone who
+   picked dark in the app. The choice is stored in a cookie and rendered into
+   the <html> tag on the server, so there is no flash of the wrong theme. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --surface-page: var(--color-ink-950);
     --surface-card: #131f1c;
     --surface-raised: #1b2b27;
@@ -73,6 +77,20 @@
     --negative: var(--color-coral-300);
     color-scheme: dark;
   }
+}
+
+:root[data-theme="dark"] {
+  --surface-page: var(--color-ink-950);
+  --surface-card: #131f1c;
+  --surface-raised: #1b2b27;
+  --surface-border: #24352f;
+  --text-strong: #eaf3ef;
+  --text-muted: #93a7a0;
+  --brand: var(--color-mint-300);
+  --brand-soft: #122a24;
+  --positive: var(--color-mint-300);
+  --negative: var(--color-coral-300);
+  color-scheme: dark;
 }
 
 * {

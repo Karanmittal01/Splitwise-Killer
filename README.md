@@ -42,6 +42,11 @@ Tailwind CSS v4
 - **Mobile invites go out over WhatsApp, SMS or the system share sheet** —
   addressed to that person's number, sent from your own phone. No SMS gateway,
   no per-message cost
+- **Private nicknames** for anybody on your list — only you see them, and their
+  own name and picture update themselves when they sign in
+- **Import from your contacts**: the native picker on Android Chrome, or a
+  `.vcf` export anywhere else. Parsed on the device; only the people you tick
+  are sent
 - Friends list with running one-on-one balances, plus shareable group links
 
 **Day to day**
@@ -53,7 +58,13 @@ Tailwind CSS v4
   no cron job, no paid scheduler
 - **Receipts** (image or PDF, stored in your database), **comments**, notes,
   38 categories with automatic guessing from the description
-- **Activity feed** with unread badge
+- **Activity feed** with unread badge and full-text search
+- **Share a friend's history** to WhatsApp, choosing which transactions go in
+- **Personal notes**: private records of money that is not coming back, kept
+  out of every balance and invisible to the other person
+- **Contact page** with a feedback form and an optional donation link
+- **Light / dark / system theme**, stored in a cookie and applied server-side
+  so there is no flash of the wrong palette
 - Responsive: sidebar on desktop, tab bar and floating add button on mobile,
   automatic dark mode, installable as a home-screen app
 

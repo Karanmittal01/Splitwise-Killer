@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "./db";
 import {
   computeBalances,
@@ -25,6 +26,29 @@ const personSelect = {
   image: true,
   isPlaceholder: true,
 } as const;
+
+/**
+ * The private labels this user has given people. Applied to `name` at the
+ * query layer, so every screen shows the nickname without threading it
+ * through the whole component tree.
+ */
+export const getNicknames = cache(async (userId: string): Promise<Map<string, string>> => {
+  const rows = await prisma.friendship.findMany({
+    where: { userId, NOT: { nickname: null } },
+    select: { friendId: true, nickname: true },
+  });
+  return new Map(rows.map((row) => [row.friendId, row.nickname!]));
+});
+
+function renamed<T extends { id: string; name: string | null }>(
+  people: T[],
+  nicknames: Map<string, string>,
+): T[] {
+  if (nicknames.size === 0) return people;
+  return people.map((person) =>
+    nicknames.has(person.id) ? { ...person, name: nicknames.get(person.id)! } : person,
+  );
+}
 
 const expenseForBalance = {
   id: true,
@@ -117,11 +141,12 @@ export async function getDashboard(userId: string) {
   const peopleIds = new Set<string>();
   for (const bucket of pairs.values()) for (const id of bucket.keys()) peopleIds.add(id);
 
-  const [people, groups] = await Promise.all([
+  const [rawPeople, groups, nicknames] = await Promise.all([
     prisma.user.findMany({ where: { id: { in: [...peopleIds] } }, select: personSelect }),
     getUserGroupsWithBalances(userId),
+    getNicknames(userId),
   ]);
-  const peopleById = new Map(people.map((p) => [p.id, p]));
+  const peopleById = new Map(renamed(rawPeople, nicknames).map((p) => [p.id, p]));
 
   const totals: DashboardTotals = [];
   const perPerson: {
@@ -217,6 +242,7 @@ export async function getUserGroupsWithBalances(
 }
 
 export async function getGroupOrThrow(groupId: string, userId: string) {
+  const nicknames = await getNicknames(userId);
   const group = await prisma.group.findFirst({
     where: { id: groupId, members: { some: { userId } } },
     include: {
@@ -226,7 +252,16 @@ export async function getGroupOrThrow(groupId: string, userId: string) {
       },
     },
   });
-  return group;
+  if (!group) return null;
+
+  return {
+    ...group,
+    members: group.members.map((membership) =>
+      nicknames.has(membership.user.id)
+        ? { ...membership, user: { ...membership.user, name: nicknames.get(membership.user.id)! } }
+        : membership,
+    ),
+  };
 }
 
 /**
@@ -299,25 +334,28 @@ export async function getSharedExpenses(
 }
 
 export async function getFriendsWithBalances(userId: string) {
-  const [friendships, pairs] = await Promise.all([
+  const [friendships, pairs, nicknames] = await Promise.all([
     prisma.friendship.findMany({
       where: { userId },
       include: { friend: { select: personSelect } },
     }),
     userPairBalances(userId),
+    getNicknames(userId),
   ]);
 
   const balanceIds = new Set<string>();
   for (const bucket of pairs.values()) for (const id of bucket.keys()) balanceIds.add(id);
 
-  const known = new Map(friendships.map((f) => [f.friendId, f.friend]));
+  const known = new Map(
+    renamed(friendships.map((f) => f.friend), nicknames).map((friend) => [friend.id, friend]),
+  );
   const missingIds = [...balanceIds].filter((id) => !known.has(id));
   if (missingIds.length > 0) {
     const extra = await prisma.user.findMany({
       where: { id: { in: missingIds } },
       select: personSelect,
     });
-    for (const person of extra) known.set(person.id, person);
+    for (const person of renamed(extra, nicknames)) known.set(person.id, person);
   }
 
   const rows = [...known.values()].map((person) => {
@@ -371,16 +409,31 @@ export async function getExpenseForUser(expenseId: string, userId: string) {
   return expense;
 }
 
-export async function getActivityFeed(userId: string, limit = 60) {
+export async function getActivityFeed(userId: string, limit = 60, search?: string) {
+  const q = search?.trim();
   return prisma.activity.findMany({
-    where: { audience: { some: { userId } } },
+    where: {
+      audience: { some: { userId } },
+      // Search across the whole feed, not just what is currently on screen.
+      ...(q
+        ? {
+            OR: [
+              { summary: { contains: q, mode: "insensitive" as const } },
+              { detail: { contains: q, mode: "insensitive" as const } },
+              { actor: { name: { contains: q, mode: "insensitive" as const } } },
+              { group: { name: { contains: q, mode: "insensitive" as const } } },
+              { expense: { description: { contains: q, mode: "insensitive" as const } } },
+            ],
+          }
+        : {}),
+    },
     include: {
       actor: { select: personSelect },
       group: { select: { id: true, name: true, emoji: true } },
       expense: { select: { id: true, description: true, deletedAt: true } },
     },
     orderBy: { createdAt: "desc" },
-    take: limit,
+    take: q ? 200 : limit,
   });
 }
 
@@ -400,8 +453,11 @@ export async function getConnections(userId: string): Promise<PersonRef[]> {
     }),
   ]);
 
+  const nicknames = await getNicknames(userId);
   const byId = new Map<string, PersonRef>();
   for (const row of friends) byId.set(row.friend.id, row.friend);
   for (const person of coMembers) byId.set(person.id, person);
-  return [...byId.values()].sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+  return renamed([...byId.values()], nicknames).sort((a, b) =>
+    (a.name ?? "").localeCompare(b.name ?? ""),
+  );
 }

@@ -27,6 +27,7 @@ export function ProfileCard({
   const [state, setState] = useState<ActionState>(idleState);
   const [picked, setPicked] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -100,23 +101,58 @@ export function ProfileCard({
           <p className="truncate text-sm muted">{email}</p>
         </div>
 
-        {/* Compact on a phone — the name and email need that width more than a
-            label does, and the pencil on the avatar already says "editable". */}
-        <div className="flex shrink-0 flex-col items-end gap-0.5">
-          <label
-            htmlFor="avatar-input"
-            className="btn btn-secondary cursor-pointer px-2.5 text-xs sm:px-4"
-            aria-label={image ? "Change picture" : "Add a picture"}
-          >
-            {pending ? "…" : "✎"}
-            <span className="hidden sm:inline">
-              {pending ? "Saving…" : image ? "Change" : "Add photo"}
-            </span>
-          </label>
-          {image && !pending && (
-            <button type="button" onClick={onRemove} className="btn btn-ghost px-2 text-[11px]">
-              Remove
-            </button>
+        {/* Just the pencil. With a picture set it opens a two-item menu so
+            removing it is still possible without a stray label in the row. */}
+        <div className="relative shrink-0">
+          {image ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setMenuOpen((open) => !open)}
+                className="btn btn-secondary px-2.5 text-xs"
+                aria-label="Change or remove picture"
+                aria-expanded={menuOpen}
+              >
+                {pending ? "…" : "✎"}
+              </button>
+              {menuOpen && (
+                <>
+                  <button
+                    type="button"
+                    aria-hidden
+                    className="fixed inset-0 z-10 cursor-default"
+                    onClick={() => setMenuOpen(false)}
+                  />
+                  <div className="absolute top-full right-0 z-20 mt-1 w-40 overflow-hidden rounded-xl border border-[var(--surface-border)] bg-[var(--surface-card)] py-1 shadow-xl">
+                    <label
+                      htmlFor="avatar-input"
+                      onClick={() => setMenuOpen(false)}
+                      className="block cursor-pointer px-3 py-2 text-sm hover:bg-[var(--surface-raised)]"
+                    >
+                      Change picture
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onRemove();
+                      }}
+                      className="block w-full px-3 py-2 text-left text-sm text-[var(--negative)] hover:bg-[var(--surface-raised)]"
+                    >
+                      Remove picture
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <label
+              htmlFor="avatar-input"
+              className="btn btn-secondary cursor-pointer px-2.5 text-xs"
+              aria-label="Add a picture"
+            >
+              {pending ? "…" : "✎"}
+            </label>
           )}
         </div>
       </div>

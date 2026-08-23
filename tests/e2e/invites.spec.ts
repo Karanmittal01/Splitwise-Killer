@@ -27,7 +27,7 @@ test("add a friend by mobile number and split with them", async ({ page }) => {
   await signIn(page, owner);
 
   await page.goto("/friends");
-  await page.getByLabel("Their name (optional)").fill("Phone Friend");
+  await page.getByLabel("Nickname (optional)").fill("Phone Friend");
   await page.getByLabel("Email or mobile number").fill(phoneFriend);
   await page.getByRole("button", { name: "Add friend" }).click();
   await expect(page.getByText(/was added|is now on your friends list/)).toBeVisible();
@@ -36,8 +36,11 @@ test("add a friend by mobile number and split with them", async ({ page }) => {
   await page.waitForURL(/\/friends\//);
 
   // The invite link is the only way a phone-only invitee can claim their share.
-  const linkInput = page.locator('input[readonly]').first();
-  inviteUrl = await linkInput.inputValue();
+  // It now rides inside the share icons rather than a visible text field.
+  const whatsapp = page.getByLabel(`WhatsApp ${phoneFriend}`);
+  await expect(whatsapp).toBeVisible();
+  const text = decodeURIComponent((await whatsapp.getAttribute("href")) ?? "");
+  inviteUrl = text.match(/https?:\/\/\S*\/join\/\S+/)?.[0] ?? "";
   expect(inviteUrl).toContain("/join/");
 
   // Split a bill with them outside any group.
@@ -45,7 +48,7 @@ test("add a friend by mobile number and split with them", async ({ page }) => {
   await page.getByLabel("Description").fill("Cab to airport");
   await page.getByLabel("Amount").fill("800");
   await page.getByRole("button", { name: "Save expense" }).click();
-  await page.waitForURL(/\/expenses\//);
+  await page.waitForURL((url) => /^\/expenses\/[^/]+$/.test(url.pathname) && !url.pathname.endsWith("/new"));
   await expect(page.getByText("You lent")).toBeVisible();
   await expect(page.getByText("₹400.00").first()).toBeVisible();
 });
@@ -94,7 +97,7 @@ test("an expense can have more than one payer", async ({ page }) => {
   await expect(page.getByText("balanced")).toBeVisible();
 
   await page.getByRole("button", { name: "Save expense" }).click();
-  await page.waitForURL(/\/expenses\//);
+  await page.waitForURL((url) => /^\/expenses\/[^/]+$/.test(url.pathname) && !url.pathname.endsWith("/new"));
 
   // Owner paid 600 and owes 500, so is up 100 on this one.
   await expect(page.getByText("You lent")).toBeVisible();
@@ -120,7 +123,7 @@ test("a receipt can be attached and viewed", async ({ page }) => {
   });
 
   await page.getByRole("button", { name: "Save expense" }).click();
-  await page.waitForURL(/\/expenses\//);
+  await page.waitForURL((url) => /^\/expenses\/[^/]+$/.test(url.pathname) && !url.pathname.endsWith("/new"));
   await expect(page.getByRole("img", { name: "Receipt" })).toBeVisible();
 });
 
@@ -134,7 +137,7 @@ test("a recurring expense schedules its next occurrence", async ({ page }) => {
   await page.getByLabel("Repeat").selectOption("MONTHLY");
   await page.getByRole("button", { name: "Save expense" }).click();
 
-  await page.waitForURL(/\/expenses\//);
+  await page.waitForURL((url) => /^\/expenses\/[^/]+$/.test(url.pathname) && !url.pathname.endsWith("/new"));
   await expect(page.getByText("Every month")).toBeVisible();
 });
 
