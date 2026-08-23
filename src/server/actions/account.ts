@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/session";
-import { normalisePhone } from "@/lib/people";
+import { normalisePhone, phoneVariants } from "@/lib/people";
 import { isSupportedCurrency } from "@/lib/currencies";
 import { fail, succeed, type ActionState } from "./types";
 
@@ -24,7 +24,7 @@ export async function updateProfileAction(
 
   if (phone) {
     const clash = await prisma.user.findFirst({
-      where: { phone, NOT: { id: user.id } },
+      where: { phone: { in: phoneVariants(phone) }, NOT: { id: user.id } },
       select: { id: true, isPlaceholder: true },
     });
     if (clash) {

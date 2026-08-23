@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/AppShell";
 import { ActionForm } from "@/components/ActionForm";
 import { Avatar } from "@/components/Avatar";
 import { CopyField } from "@/components/CopyField";
+import { ShareInvite } from "@/components/ShareInvite";
 import { SubmitButton } from "@/components/form";
 import { CURRENCIES } from "@/lib/currencies";
 import { prisma } from "@/lib/db";
@@ -192,9 +193,11 @@ export default async function GroupSettingsPage({ params }: { params: Promise<{ 
 
                   {invite && (
                     <div className="w-full">
-                      <CopyField
+                      <ShareInvite
                         label={`Invite link for ${displayName(member)}`}
-                        value={inviteLink(invite.token)}
+                        link={inviteLink(invite.token)}
+                        name={displayName(member)}
+                        phone={member.phone}
                       />
                       {emailConfigured && invite.email && (
                         <ActionForm action={resendInviteEmailAction} className="mt-2">

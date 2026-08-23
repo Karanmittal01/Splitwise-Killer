@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { normaliseEmail, normalisePhone, phoneVariants } from "./contact";
 
 /**
  * People can exist in this app before they ever sign in.
@@ -11,22 +12,8 @@ import { prisma } from "./db";
  * merge the placeholder into their real account.
  */
 
-export function normaliseEmail(input: string | null | undefined): string | null {
-  const value = input?.trim().toLowerCase();
-  if (!value) return null;
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value)) return null;
-  return value;
-}
-
-/** Keeps digits and a leading +, so "+91 98765 43210" -> "+919876543210". */
-export function normalisePhone(input: string | null | undefined): string | null {
-  const raw = input?.trim();
-  if (!raw) return null;
-  const hasPlus = raw.startsWith("+");
-  const digits = raw.replace(/\D/g, "");
-  if (digits.length < 7 || digits.length > 15) return null;
-  return `${hasPlus ? "+" : ""}${digits}`;
-}
+// Re-exported so callers can keep importing contact helpers from here.
+export { normaliseEmail, normalisePhone, phoneVariants } from "./contact";
 
 export type PersonInput = {
   name?: string | null;
@@ -54,7 +41,12 @@ export async function findOrCreatePerson(
 
   const existing = await prisma.user.findFirst({
     where: {
-      OR: [...(email ? [{ email }] : []), ...(phone ? [{ phone }] : [])],
+      OR: [
+        ...(email ? [{ email }] : []),
+        // Match numbers stored before canonicalisation too, so an existing
+        // person is found rather than duplicated.
+        ...(phone ? [{ phone: { in: phoneVariants(phone) } }] : []),
+      ],
     },
     select: { id: true, name: true, email: true, phone: true, isPlaceholder: true },
   });

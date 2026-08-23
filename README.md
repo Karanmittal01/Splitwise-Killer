@@ -36,6 +36,12 @@ Tailwind CSS v4
   using that email, the account is theirs. Invited by phone, or signed up with
   a different address? The invite link merges the placeholder into their real
   account, balances and history included
+- **Mobile numbers are canonicalised**, so `9876543210`, `+91 98765 43210` and
+  `098765 43210` are one person rather than three. Set `DEFAULT_COUNTRY_CODE`
+  for the dialling code to assume (default `91`)
+- **Mobile invites go out over WhatsApp, SMS or the system share sheet** —
+  addressed to that person's number, sent from your own phone. No SMS gateway,
+  no per-message cost
 - Friends list with running one-on-one balances, plus shareable group links
 
 **Day to day**

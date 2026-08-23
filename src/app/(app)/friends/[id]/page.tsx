@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { EmptyState, PageHeader } from "@/components/AppShell";
 import { ActionForm } from "@/components/ActionForm";
 import { Avatar } from "@/components/Avatar";
-import { CopyField } from "@/components/CopyField";
+import { ShareInvite } from "@/components/ShareInvite";
 import { ExpenseList } from "@/components/ExpenseList";
 import { Money } from "@/components/Money";
 import { SubmitButton } from "@/components/form";
@@ -39,7 +39,7 @@ export default async function FriendPage({ params }: { params: Promise<{ id: str
       ? prisma.invitation.findFirst({
           where: { targetUserId: person.id, acceptedAt: null },
           orderBy: { createdAt: "desc" },
-          select: { token: true, email: true },
+          select: { token: true, email: true, phone: true },
         })
       : Promise.resolve(null),
   ]);
@@ -104,7 +104,11 @@ export default async function FriendPage({ params }: { params: Promise<{ id: str
             Send them this link. When they sign in with Google, everything you&apos;ve split with
             them is already there.
           </p>
-          <CopyField label="Invite link" value={inviteLink(invite.token)} />
+          <ShareInvite
+            link={inviteLink(invite.token)}
+            name={name}
+            phone={person.phone}
+          />
           {emailConfigured && invite.email && (
             <ActionForm action={resendInviteEmailAction} className="mt-3">
               <input type="hidden" name="targetUserId" value={person.id} />
