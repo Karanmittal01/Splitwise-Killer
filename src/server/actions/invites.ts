@@ -6,7 +6,8 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { recordActivity } from "@/lib/activity";
 import { PeopleError, ensureFriendship, mergeUsers } from "@/lib/people";
-import { fail, type ActionState } from "./types";
+import { emailConfigured, sendInviteEmail } from "@/lib/notify";
+import { fail, succeed, type ActionState } from "./types";
 
 /**
  * Redeem an invite link. The placeholder account the inviter has been putting
@@ -112,4 +113,49 @@ export async function joinGroupByTokenAction(
 
   revalidatePath("/groups");
   redirect(`/groups/${group.id}`);
+}
+
+/**
+ * Email (or re-email) a pending invite.
+ *
+ * Useful when somebody was added before email delivery was configured, or when
+ * the original message got lost.
+ */
+export async function resendInviteEmailAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireUser();
+  const targetUserId = String(formData.get("targetUserId") ?? "");
+  if (!targetUserId) return fail("Missing person.");
+
+  if (!emailConfigured) {
+    return fail("Email delivery isn't set up on this server — copy the link instead.");
+  }
+
+  const invite = await prisma.invitation.findFirst({
+    where: {
+      targetUserId,
+      acceptedAt: null,
+      // You can only re-send invites you sent, or ones for a group you're in.
+      OR: [{ invitedById: user.id }, { group: { members: { some: { userId: user.id } } } }],
+    },
+    orderBy: { createdAt: "desc" },
+    select: { token: true, email: true, groupId: true },
+  });
+  if (!invite) return fail("There's no pending invite for that person.");
+  if (!invite.email) {
+    return fail("They were invited by mobile number, so there's no address to email. Copy the link instead.");
+  }
+
+  const sent = await sendInviteEmail({
+    to: invite.email,
+    token: invite.token,
+    inviterId: user.id,
+    groupId: invite.groupId,
+  });
+
+  return sent
+    ? succeed(`Invite emailed to ${invite.email}.`)
+    : fail("The email couldn't be sent. Check the Resend settings, or copy the link instead.");
 }

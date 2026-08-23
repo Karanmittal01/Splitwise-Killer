@@ -107,6 +107,7 @@ async function addPersonToGroup(groupId: string, raw: string, inviterId: string)
   await ensureFriendship(inviterId, person.id);
 
   let inviteToken: string | null = null;
+  let emailed = false;
   if (person.isPlaceholder) {
     const invite = await createInvitation({
       targetUserId: person.id,
@@ -116,10 +117,12 @@ async function addPersonToGroup(groupId: string, raw: string, inviterId: string)
       groupId,
     });
     inviteToken = invite.token;
-    if (email) await sendInviteEmail({ to: email, token: invite.token, inviterId, groupId });
+    if (email) {
+      emailed = await sendInviteEmail({ to: email, token: invite.token, inviterId, groupId });
+    }
   }
 
-  return { person, inviteToken };
+  return { person, inviteToken, emailed };
 }
 
 export async function addGroupMemberAction(
@@ -137,7 +140,7 @@ export async function addGroupMemberAction(
       where: { id: groupId },
       select: { name: true, members: { select: { userId: true } } },
     });
-    const { person } = await addPersonToGroup(groupId, raw, user.id);
+    const { person, emailed } = await addPersonToGroup(groupId, raw, user.id);
 
     await recordActivity({
       type: "GROUP_MEMBER_ADDED",
@@ -147,11 +150,14 @@ export async function addGroupMemberAction(
       audience: [...group.members.map((m) => m.userId), person.id],
     });
 
+    const who = person.name ?? person.email ?? person.phone;
     revalidatePath(`/groups/${groupId}`);
     return succeed(
-      person.isPlaceholder
-        ? `Invited ${person.name ?? person.email ?? person.phone}. Share their invite link so they can sign in.`
-        : `Added ${person.name ?? person.email}.`,
+      !person.isPlaceholder
+        ? `Added ${who}.`
+        : emailed
+          ? `Invited ${who} — we've emailed them a link to sign in.`
+          : `Invited ${who}. Copy their invite link below and send it to them.`,
     );
   } catch (error) {
     if (error instanceof PeopleError) return fail(error.message);

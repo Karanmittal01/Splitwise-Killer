@@ -22,8 +22,18 @@ async function send(to: string, subject: string, html: string): Promise<boolean>
       },
       body: JSON.stringify({ from: process.env.RESEND_FROM, to, subject, html }),
     });
-    return response.ok;
-  } catch {
+    if (!response.ok) {
+      // Surface the reason in the server logs — a rejected send is almost
+      // always an unverified sending domain or a bad API key, and silence
+      // makes that impossible to diagnose.
+      console.error(
+        `Invite email to ${to} was rejected (${response.status}): ${await response.text()}`,
+      );
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error("Invite email could not be sent:", error);
     return false;
   }
 }

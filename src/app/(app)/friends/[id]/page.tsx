@@ -12,6 +12,8 @@ import { inviteLink } from "@/lib/people";
 import { getSharedExpenses, userPairBalances } from "@/lib/queries";
 import { displayName, requireUser } from "@/lib/session";
 import { removeFriendAction } from "@/server/actions/friends";
+import { resendInviteEmailAction } from "@/server/actions/invites";
+import { emailConfigured } from "@/lib/notify";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -37,7 +39,7 @@ export default async function FriendPage({ params }: { params: Promise<{ id: str
       ? prisma.invitation.findFirst({
           where: { targetUserId: person.id, acceptedAt: null },
           orderBy: { createdAt: "desc" },
-          select: { token: true },
+          select: { token: true, email: true },
         })
       : Promise.resolve(null),
   ]);
@@ -103,6 +105,14 @@ export default async function FriendPage({ params }: { params: Promise<{ id: str
             them is already there.
           </p>
           <CopyField label="Invite link" value={inviteLink(invite.token)} />
+          {emailConfigured && invite.email && (
+            <ActionForm action={resendInviteEmailAction} className="mt-3">
+              <input type="hidden" name="targetUserId" value={person.id} />
+              <SubmitButton className="btn btn-secondary text-sm" pendingLabel="Sending…">
+                ✉️ Email this invite to {invite.email}
+              </SubmitButton>
+            </ActionForm>
+          )}
         </div>
       )}
 

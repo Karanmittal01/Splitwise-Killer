@@ -34,6 +34,7 @@ export async function addFriendAction(
     await ensureFriendship(user.id, person.id);
 
     let invited = false;
+    let emailed = false;
     if (person.isPlaceholder) {
       const invite = await createInvitation({
         targetUserId: person.id,
@@ -42,7 +43,9 @@ export async function addFriendAction(
         phone,
       });
       invited = true;
-      if (email) await sendInviteEmail({ to: email, token: invite.token, inviterId: user.id });
+      if (email) {
+        emailed = await sendInviteEmail({ to: email, token: invite.token, inviterId: user.id });
+      }
     }
 
     await recordActivity({
@@ -54,9 +57,11 @@ export async function addFriendAction(
 
     revalidatePath("/friends");
     return succeed(
-      invited
-        ? `${person.name ?? handle} was added. Share their invite link from their page so they can sign in.`
-        : `${person.name ?? handle} is now on your friends list.`,
+      !invited
+        ? `${person.name ?? handle} is now on your friends list.`
+        : emailed
+          ? `${person.name ?? handle} was added — we've emailed them a link to sign in.`
+          : `${person.name ?? handle} was added. Open their page to copy an invite link to send them.`,
     );
   } catch (error) {
     if (error instanceof PeopleError) return fail(error.message);

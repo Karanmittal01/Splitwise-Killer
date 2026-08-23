@@ -17,6 +17,7 @@ import {
   resetInviteLinkAction,
   updateGroupAction,
 } from "@/server/actions/groups";
+import { resendInviteEmailAction } from "@/server/actions/invites";
 
 export const metadata = { title: "Group settings" };
 
@@ -195,6 +196,14 @@ export default async function GroupSettingsPage({ params }: { params: Promise<{ 
                         label={`Invite link for ${displayName(member)}`}
                         value={inviteLink(invite.token)}
                       />
+                      {emailConfigured && invite.email && (
+                        <ActionForm action={resendInviteEmailAction} className="mt-2">
+                          <input type="hidden" name="targetUserId" value={member.id} />
+                          <SubmitButton className="btn btn-ghost text-xs" pendingLabel="Sending…">
+                            ✉️ Email this invite to {invite.email}
+                          </SubmitButton>
+                        </ActionForm>
+                      )}
                     </div>
                   )}
                 </div>
