@@ -3,6 +3,7 @@ import { Avatar } from "./Avatar";
 import { NavLink, TabLink } from "./NavLink";
 import type { CurrentUser } from "@/lib/session";
 import { displayName } from "@/lib/session";
+import { BrandMark } from "./BrandMark";
 
 export type ShellGroup = { id: string; name: string; emoji: string };
 
@@ -22,9 +23,7 @@ export function AppShell({
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-[var(--surface-border)] px-3 py-5 md:flex">
         <Link href="/dashboard" className="mb-6 flex items-center gap-2 px-2">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-[var(--color-mint-600)] text-lg text-white">
-            ₹
-          </span>
+          <BrandMark size={36} />
           <span className="text-[1.05rem] font-bold tracking-tight">Splitwise Killer</span>
         </Link>
 
@@ -75,9 +74,7 @@ export function AppShell({
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-[var(--surface-border)] bg-[var(--surface-page)]/85 px-4 py-3 backdrop-blur md:hidden">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-[var(--color-mint-600)] text-white">
-              ₹
-            </span>
+            <BrandMark size={32} />
             <span className="font-bold">Splitwise Killer</span>
           </Link>
           <Link href="/account">

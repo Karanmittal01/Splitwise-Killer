@@ -1,6 +1,6 @@
 import { ActionForm } from "./ActionForm";
+import { CurrencySelect } from "./CurrencySelect";
 import { SubmitButton } from "./form";
-import { CURRENCIES } from "@/lib/currencies";
 import { centsToDecimalString, formatMoney } from "@/lib/money";
 import { displayName } from "@/lib/session";
 import { recordPaymentAction } from "@/server/actions/settle";
@@ -97,32 +97,16 @@ export function SettleForm({
             </div>
           </div>
 
-          <div className="flex gap-3">
-            <div className="w-28 shrink-0">
-              <label className="label" htmlFor="currency">
-                Currency
-              </label>
-              <select
-                id="currency"
-                name="currency"
-                className="field"
-                defaultValue={defaults.currency}
-              >
-                {CURRENCIES.map((c) => (
-                  <option key={c.code} value={c.code}>
-                    {c.symbol} {c.code}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="min-w-0 flex-1">
+          <div className="grid grid-cols-[4.25rem_1fr] gap-3 sm:grid-cols-[4.25rem_1fr_10.5rem]">
+            <CurrencySelect name="currency" defaultValue={defaults.currency} />
+            <div className="min-w-0">
               <label className="label" htmlFor="amount">
                 Amount
               </label>
               <input
                 id="amount"
                 name="amount"
-                className="field text-xl font-semibold tabular-nums"
+                className="field text-2xl font-semibold tabular-nums"
                 inputMode="decimal"
                 placeholder="0.00"
                 defaultValue={
@@ -131,7 +115,7 @@ export function SettleForm({
                 required
               />
             </div>
-            <div className="w-40 shrink-0">
+            <div className="col-span-2 min-w-0 sm:col-span-1">
               <label className="label" htmlFor="date">
                 Date
               </label>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
+import { BrandMark } from "@/components/BrandMark";
 
 const FEATURES = [
   {
@@ -43,9 +44,7 @@ export default async function LandingPage() {
     <div className="mx-auto w-full max-w-5xl px-5 py-10 md:py-16">
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-[var(--color-mint-600)] text-lg text-white">
-            ₹
-          </span>
+          <BrandMark size={36} />
           <span className="text-lg font-bold tracking-tight">Splitwise Killer</span>
         </div>
         <Link href="/login" className="btn btn-secondary">

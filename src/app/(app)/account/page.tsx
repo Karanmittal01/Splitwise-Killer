@@ -1,6 +1,7 @@
 import { PageHeader } from "@/components/AppShell";
 import { ActionForm } from "@/components/ActionForm";
 import { Avatar } from "@/components/Avatar";
+import { AvatarUpload } from "@/components/AvatarUpload";
 import { SubmitButton } from "@/components/form";
 import { CURRENCIES } from "@/lib/currencies";
 import { signOut } from "@/lib/auth";
@@ -31,6 +32,8 @@ export default async function AccountPage() {
             <p className="truncate text-sm muted">{user.email}</p>
           </div>
         </div>
+
+        <AvatarUpload userId={user.id} name={displayName(user)} image={user.image} />
 
         <div className="card grid grid-cols-3 divide-x divide-[var(--surface-border)] p-4 text-center">
           <Stat label="Groups" value={groupCount} />

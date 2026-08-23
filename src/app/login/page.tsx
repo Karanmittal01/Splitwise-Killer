@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { googleConfigured, signIn } from "@/lib/auth";
 import { getCurrentUser } from "@/lib/session";
 import { SubmitButton } from "@/components/form";
+import { BrandMark } from "@/components/BrandMark";
 
 export const metadata = { title: "Sign in" };
 
@@ -32,9 +33,7 @@ export default async function LoginPage({
     <div className="grid min-h-dvh place-items-center px-5 py-10">
       <div className="w-full max-w-md">
         <Link href="/" className="mb-8 flex items-center justify-center gap-2">
-          <span className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--color-mint-600)] text-xl text-white">
-            ₹
-          </span>
+          <BrandMark size={40} />
           <span className="text-xl font-bold tracking-tight">Splitwise Killer</span>
         </Link>
 

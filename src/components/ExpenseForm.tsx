@@ -3,9 +3,9 @@
 import { useActionState, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { Avatar } from "./Avatar";
+import { CurrencySelect } from "./CurrencySelect";
 import { FormMessage, SubmitButton } from "./form";
 import { CATEGORIES, category as categoryById, guessCategory } from "@/lib/categories";
-import { CURRENCIES } from "@/lib/currencies";
 import { formatMoney, parseMoneyToCents } from "@/lib/money";
 import { computeOwed, participantValue, SplitError } from "@/lib/split";
 import { RECURRENCE_LABELS } from "@/lib/recurring";
@@ -263,31 +263,18 @@ export function ExpenseForm({
           </div>
         </div>
 
-        <div className="flex gap-3">
-          <div className="w-28 shrink-0">
-            <label className="label" htmlFor="currency">
-              Currency
-            </label>
-            <select
-              id="currency"
-              className="field"
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
-            >
-              {CURRENCIES.map((c) => (
-                <option key={c.code} value={c.code}>
-                  {c.symbol} {c.code}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="min-w-0 flex-1">
+        {/* The amount is the point of this screen, so it gets the width.
+            On a phone the date drops to its own row rather than squeezing it. */}
+        <div className="grid grid-cols-[4.25rem_1fr] gap-3 sm:grid-cols-[4.25rem_1fr_10.5rem]">
+          <CurrencySelect value={currency} onChange={setCurrency} />
+
+          <div className="min-w-0">
             <label className="label" htmlFor="amount">
               Amount
             </label>
             <input
               id="amount"
-              className="field text-xl font-semibold tabular-nums"
+              className="field text-2xl font-semibold tabular-nums"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               inputMode="decimal"
@@ -295,7 +282,8 @@ export function ExpenseForm({
               required
             />
           </div>
-          <div className="w-40 shrink-0">
+
+          <div className="col-span-2 min-w-0 sm:col-span-1">
             <label className="label" htmlFor="date">
               Date
             </label>
