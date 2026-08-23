@@ -129,8 +129,9 @@ Set these environment variables:
 | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | from the step above |
 | `RESEND_API_KEY` / `RESEND_FROM` | optional, for invite emails |
 
-Then run `npx prisma db push` once against the production database (the build
-itself only runs `prisma generate`).
+The build command (`prisma generate && prisma db push && next build`) creates
+the database tables for you on the first deploy, so there is nothing to run by
+hand.
 
 Any Node host works just as well — `npm run build && npm start` behind a
 reverse proxy on a VPS, Railway, Render, Fly.io, or a Docker container.
