@@ -18,7 +18,9 @@ test("upload, serve and remove a profile picture", async ({ page }) => {
   await signIn(page);
   await page.goto("/account");
 
-  await expect(page.getByRole("heading", { name: "Profile picture" })).toBeVisible();
+  // One card: the picture lives beside the name, not in a section of its own.
+  await expect(page.getByRole("heading", { name: "Profile picture" })).toHaveCount(0);
+  await expect(page.getByLabel("Add a picture")).toBeVisible();
   await page.setInputFiles("#avatar-input", {
     name: "me.png",
     mimeType: "image/png",

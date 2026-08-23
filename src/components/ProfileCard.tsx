@@ -37,13 +37,21 @@ async function toSquareThumbnail(file: File): Promise<Blob> {
   });
 }
 
-export function AvatarUpload({
+/**
+ * Who you are, with the picture editable in place.
+ *
+ * The avatar itself is the upload button — tapping it (or the small control on
+ * the right) opens the picker. One card, one copy of your face.
+ */
+export function ProfileCard({
   userId,
   name,
+  email,
   image,
 }: {
   userId: string;
   name: string;
+  email: string | null;
   image: string | null;
 }) {
   const [state, setState] = useState<ActionState>(idleState);
@@ -51,9 +59,6 @@ export function AvatarUpload({
   const [pending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // The action is called directly with a FormData we build here — no hidden
-  // form to keep in sync, and the resized blob goes up in place of the
-  // original file.
   function onPick(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -89,51 +94,59 @@ export function AvatarUpload({
 
   return (
     <div className="card p-4">
-      <h2 className="mb-3 font-semibold">Profile picture</h2>
+      <input
+        ref={inputRef}
+        id="avatar-input"
+        type="file"
+        accept="image/*"
+        onChange={onPick}
+        disabled={pending}
+        className="hidden"
+      />
 
       <div className="flex items-center gap-4">
-        {preview ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={preview}
-            alt=""
-            width={64}
-            height={64}
-            className="h-16 w-16 shrink-0 rounded-full object-cover"
-          />
-        ) : (
-          <Avatar id={userId} name={name} image={image} size={64} />
-        )}
+        {/* Tapping the picture is the most obvious way to change it. */}
+        <label htmlFor="avatar-input" className="relative cursor-pointer" title="Change picture">
+          {preview ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={preview}
+              alt=""
+              width={56}
+              height={56}
+              className="h-14 w-14 rounded-full object-cover"
+            />
+          ) : (
+            <Avatar id={userId} name={name} image={image} size={56} />
+          )}
+          <span className="absolute -right-0.5 -bottom-0.5 grid h-5 w-5 place-items-center rounded-full bg-[var(--color-mint-600)] text-[10px] text-white ring-2 ring-[var(--surface-card)]">
+            ✎
+          </span>
+        </label>
 
         <div className="min-w-0 flex-1">
-          <input
-            ref={inputRef}
-            id="avatar-input"
-            type="file"
-            accept="image/*"
-            onChange={onPick}
-            disabled={pending}
-            className="hidden"
-          />
-          <div className="flex flex-wrap items-center gap-2">
-            <label htmlFor="avatar-input" className="btn btn-secondary cursor-pointer text-sm">
-              {pending ? "Uploading…" : image ? "Change picture" : "Upload a picture"}
-            </label>
-            {image && (
-              <button
-                type="button"
-                onClick={onRemove}
-                disabled={pending}
-                className="btn btn-ghost text-xs"
-              >
-                Remove
-              </button>
-            )}
-          </div>
+          <p className="truncate text-lg font-semibold">{name}</p>
+          <p className="truncate text-sm muted">{email}</p>
+        </div>
 
-          <p className="mt-2 text-xs muted">
-            Cropped to a square and shrunk on your phone before uploading, so it stays quick.
-          </p>
+        {/* Compact on a phone — the name and email need that width more than a
+            label does, and the pencil on the avatar already says "editable". */}
+        <div className="flex shrink-0 flex-col items-end gap-0.5">
+          <label
+            htmlFor="avatar-input"
+            className="btn btn-secondary cursor-pointer px-2.5 text-xs sm:px-4"
+            aria-label={image ? "Change picture" : "Add a picture"}
+          >
+            {pending ? "…" : "✎"}
+            <span className="hidden sm:inline">
+              {pending ? "Saving…" : image ? "Change" : "Add photo"}
+            </span>
+          </label>
+          {image && !pending && (
+            <button type="button" onClick={onRemove} className="btn btn-ghost px-2 text-[11px]">
+              Remove
+            </button>
+          )}
         </div>
       </div>
 

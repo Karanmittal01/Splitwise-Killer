@@ -1,7 +1,6 @@
 import { PageHeader } from "@/components/AppShell";
 import { ActionForm } from "@/components/ActionForm";
-import { Avatar } from "@/components/Avatar";
-import { AvatarUpload } from "@/components/AvatarUpload";
+import { ProfileCard } from "@/components/ProfileCard";
 import { SubmitButton } from "@/components/form";
 import { CURRENCIES } from "@/lib/currencies";
 import { signOut } from "@/lib/auth";
@@ -25,15 +24,12 @@ export default async function AccountPage() {
       <PageHeader title="Account" subtitle="Your profile and preferences." />
 
       <div className="flex max-w-xl flex-col gap-6">
-        <div className="card flex items-center gap-4 p-4">
-          <Avatar id={user.id} name={displayName(user)} image={user.image} size={56} />
-          <div className="min-w-0">
-            <p className="truncate text-lg font-semibold">{displayName(user)}</p>
-            <p className="truncate text-sm muted">{user.email}</p>
-          </div>
-        </div>
-
-        <AvatarUpload userId={user.id} name={displayName(user)} image={user.image} />
+        <ProfileCard
+          userId={user.id}
+          name={displayName(user)}
+          email={user.email}
+          image={user.image}
+        />
 
         <div className="card grid grid-cols-3 divide-x divide-[var(--surface-border)] p-4 text-center">
           <Stat label="Groups" value={groupCount} />
