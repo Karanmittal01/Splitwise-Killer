@@ -15,9 +15,18 @@ const DIRECTIONS = [
   { id: "SPENT", label: "I just spent it", hint: "Only a record" },
 ];
 
-export default async function NewNotePage() {
+export default async function NewNotePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ about?: string }>;
+}) {
   const user = await requireUser();
-  const connections = await getConnections(user.id);
+  const [connections, params] = await Promise.all([getConnections(user.id), searchParams]);
+
+  // Arriving from somebody's own notes page: start with them already picked.
+  // The action re-checks that they're really a friend, so a made-up id here
+  // only ever means the picker opens on "Nobody in particular".
+  const about = connections.some((person) => person.id === params.about) ? params.about : "";
 
   return (
     <>
@@ -103,7 +112,7 @@ export default async function NewNotePage() {
                 <label className="label" htmlFor="aboutUserId">
                   Who it involved (optional)
                 </label>
-                <select id="aboutUserId" name="aboutUserId" className="field" defaultValue="">
+                <select id="aboutUserId" name="aboutUserId" className="field" defaultValue={about}>
                   <option value="">Nobody in particular</option>
                   {connections.map((person) => (
                     <option key={person.id} value={person.id}>
@@ -146,7 +155,7 @@ export default async function NewNotePage() {
             <SubmitButton className="btn btn-primary flex-1 py-3" pendingLabel="Saving…">
               Save note
             </SubmitButton>
-            <a href="/notes" className="btn btn-secondary py-3">
+            <a href={about ? `/notes/person/${about}` : "/notes"} className="btn btn-secondary py-3">
               Cancel
             </a>
           </div>

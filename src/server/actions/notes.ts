@@ -73,7 +73,9 @@ export async function createNoteAction(
   });
 
   revalidatePath("/notes");
-  redirect("/notes");
+  // Added from somebody's own page? Go back there, not to the full list.
+  if (aboutUserId) revalidatePath(`/notes/person/${aboutUserId}`);
+  redirect(aboutUserId ? `/notes/person/${aboutUserId}` : "/notes");
 }
 
 export async function deleteNoteAction(
@@ -85,9 +87,15 @@ export async function deleteNoteAction(
   if (!id) return fail("Missing note.");
 
   // Scoped to the owner — nobody else can even see these.
-  const deleted = await prisma.personalNote.deleteMany({ where: { id, userId: user.id } });
-  if (deleted.count === 0) return fail("That note is not yours to delete.");
+  const note = await prisma.personalNote.findFirst({
+    where: { id, userId: user.id },
+    select: { aboutUserId: true },
+  });
+  if (!note) return fail("That note is not yours to delete.");
+
+  await prisma.personalNote.delete({ where: { id } });
 
   revalidatePath("/notes");
+  if (note.aboutUserId) revalidatePath(`/notes/person/${note.aboutUserId}`);
   return succeed("Note deleted.");
 }
