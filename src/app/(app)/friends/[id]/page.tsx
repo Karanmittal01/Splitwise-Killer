@@ -2,10 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EmptyState, PageHeader } from "@/components/AppShell";
 import { ActionForm } from "@/components/ActionForm";
-import { Avatar } from "@/components/Avatar";
 import { ExpenseList } from "@/components/ExpenseList";
 import { Money } from "@/components/Money";
-import { NicknameEditor } from "@/components/NicknameEditor";
+import { FriendNameHeading } from "@/components/FriendNameHeading";
 import { ShareInvite } from "@/components/ShareInvite";
 import { ShareTransactions, type ShareableExpense } from "@/components/ShareTransactions";
 import { SubmitButton } from "@/components/form";
@@ -87,10 +86,13 @@ export default async function FriendPage({ params }: { params: Promise<{ id: str
       <PageHeader
         back={{ href: "/friends", label: "Friends" }}
         title={
-          <span className="flex items-center gap-2.5">
-            <Avatar id={person.id} name={name} image={person.image} size={44} />
-            {name}
-          </span>
+          <FriendNameHeading
+            friendId={person.id}
+            name={name}
+            realName={realName}
+            nickname={nickname}
+            image={person.image}
+          />
         }
         subtitle={
           <span className="flex flex-wrap items-center gap-x-2">
@@ -100,12 +102,6 @@ export default async function FriendPage({ params }: { params: Promise<{ id: str
         }
         action={
           <div className="flex flex-wrap gap-2">
-            <ShareTransactions
-              expenses={shareable}
-              friendName={name}
-              friendPhone={person.phone}
-              balanceLine={balanceLine}
-            />
             <Link href={`/friends/${person.id}/settle`} className="btn btn-secondary">
               Settle up
             </Link>
@@ -116,7 +112,8 @@ export default async function FriendPage({ params }: { params: Promise<{ id: str
         }
       />
 
-      <div className="card animate-rise mb-5 px-4 py-3">
+      {/* Balance and the share-list action share one compact row. */}
+      <div className="card animate-rise mb-5 flex flex-wrap items-center justify-between gap-3 px-4 py-3">
         {balances.length === 0 ? (
           <p className="text-sm muted">You&apos;re all settled up with {name}.</p>
         ) : (
@@ -131,18 +128,19 @@ export default async function FriendPage({ params }: { params: Promise<{ id: str
             ))}
           </div>
         )}
-        <div className="mt-1">
-          <NicknameEditor friendId={person.id} nickname={nickname} realName={realName} />
-        </div>
+        <ShareTransactions
+          expenses={shareable}
+          friendName={name}
+          friendPhone={person.phone}
+          balanceLine={balanceLine}
+        />
       </div>
 
       {person.isPlaceholder && invite && (
         <div className="card mb-5 flex flex-wrap items-center justify-between gap-3 px-4 py-3">
           <div className="min-w-0">
             <p className="text-sm font-semibold">{name} hasn&apos;t signed in yet</p>
-            <p className="text-xs muted">
-              Send them this link — they sign in with Google and their share is already there.
-            </p>
+            <p className="text-xs muted">Send them a link — they sign in with Google to see their share.</p>
           </div>
           <ShareInvite
             link={inviteLink(invite.token)}

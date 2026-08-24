@@ -29,12 +29,13 @@ test("add a friend, then give them a private nickname", async ({ page }) => {
   await page.locator("a[href^='/friends/']").first().click();
   await page.waitForURL(/\/friends\//);
 
-  await page.getByRole("button", { name: /Add a nickname/ }).click();
-  await page.getByLabel(/Nickname/).fill("Mountain Mate");
+  // Rename inline via the pencil beside the name.
+  await page.getByRole("button", { name: "Edit name" }).click();
+  await page.getByLabel("Name for this friend").fill("Mountain Mate");
   await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.getByText("Nickname saved.")).toBeVisible();
+  await expect(page.getByText("Mountain Mate").first()).toBeVisible();
 
-  // The nickname replaces their name everywhere it is shown.
+  // The chosen name replaces their real name everywhere it is shown.
   await page.goto("/friends");
   await expect(page.getByText("Mountain Mate")).toBeVisible();
 });
