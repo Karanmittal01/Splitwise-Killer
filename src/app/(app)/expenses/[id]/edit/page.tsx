@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { PageHeader } from "@/components/AppShell";
 import { ExpenseForm, type FormGroup } from "@/components/ExpenseForm";
+import type { SplitMethod } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/db";
 import { centsToDecimalString } from "@/lib/money";
 import { getConnections, getExpenseForUser } from "@/lib/queries";
@@ -44,17 +45,33 @@ export default async function EditExpensePage({ params }: { params: Promise<{ id
     members: group.members.map((m) => m.user),
   }));
 
-  const participants = expense.shares
-    .filter((s) => s.owedCents > 0)
-    .map((s) => ({
-      userId: s.userId,
-      value:
-        expense.splitMethod === "EXACT"
-          ? centsToDecimalString(s.owedCents, expense.currency)
-          : expense.splitMethod === "PERCENT"
-            ? ((s.owedCents / expense.amountCents) * 100).toFixed(2)
-            : "",
-    }));
+  // Everyone on the expense, including anybody who owes nothing. One person
+  // carrying the whole bill is an ordinary shape now, and dropping the other
+  // from the form would quietly rewrite the expense on save.
+  const owing = expense.shares.filter((s) => s.owedCents > 0);
+
+  // That shape re-opens as shares rather than exact amounts, so the form still
+  // recognises it as one of the four one-on-one options — and changing the
+  // total afterwards doesn't leave a stale figure behind in the split.
+  const wholeOnOne =
+    expense.splitMethod !== "EQUAL" &&
+    owing.length === 1 &&
+    owing[0].owedCents === expense.amountCents;
+
+  const splitMethod: SplitMethod =
+    expense.splitMethod === "EQUAL" ? "EQUAL" : wholeOnOne ? "SHARES" : "EXACT";
+
+  const participants = expense.shares.map((s) => ({
+    userId: s.userId,
+    value:
+      splitMethod === "EQUAL"
+        ? ""
+        : splitMethod === "SHARES"
+          ? s.owedCents > 0
+            ? "1"
+            : "0"
+          : centsToDecimalString(s.owedCents, expense.currency),
+  }));
 
   const payers = expense.shares
     .filter((s) => s.paidCents > 0)
@@ -93,20 +110,11 @@ export default async function EditExpensePage({ params }: { params: Promise<{ id
             date: expense.date.toISOString().slice(0, 10),
             category: expense.category,
             notes: expense.notes ?? "",
-            // Shares are already materialised, so re-opening the form with an
-            // exact split reproduces the saved numbers no matter how it was
-            // originally entered.
-            splitMethod: expense.splitMethod === "EQUAL" ? "EQUAL" : "EXACT",
+            // Shares are already materialised, so re-opening the form
+            // reproduces the saved numbers no matter how they were entered.
+            splitMethod,
             recurrence: expense.recurrence,
-            participants:
-              expense.splitMethod === "EQUAL"
-                ? participants.map((p) => ({ ...p, value: "" }))
-                : expense.shares
-                    .filter((s) => s.owedCents > 0)
-                    .map((s) => ({
-                      userId: s.userId,
-                      value: centsToDecimalString(s.owedCents, expense.currency),
-                    })),
+            participants,
             payers,
             hasReceipt: Boolean(expense.receipt),
           }}

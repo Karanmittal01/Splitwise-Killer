@@ -18,6 +18,22 @@ async function signIn(page: Page, email = owner) {
   await page.waitForURL("**/dashboard");
 }
 
+/**
+ * Add one person and wait for *that* add to land.
+ *
+ * The page keeps the previous success message on screen, so a generic
+ * /was added/ matches the one before and lets the test navigate away while the
+ * second add is still in flight. Every message names the handle, so wait for
+ * this one's.
+ */
+async function addFriend(page: Page, handle: string) {
+  await page.getByLabel("Email or mobile number").fill(handle);
+  await page.getByRole("button", { name: "Add friend" }).click();
+  // The message names them the way the app shows them — for an email that is
+  // the part before the @.
+  await expect(page.getByRole("status").first()).toContainText(handle.split("@")[0]);
+}
+
 async function addExpenseWith(page: Page, friendPath: string, description: string, amount: string) {
   await page.goto(friendPath);
   await page.getByRole("link", { name: "+ Add expense" }).click();
@@ -36,13 +52,8 @@ test("merging two placeholder friends sums their balances into one", async ({ pa
   // Two separate placeholder friends who are really the same person: one added
   // by phone, one by email.
   await page.goto("/friends/new");
-  await page.getByLabel("Email or mobile number").fill(dupPhone);
-  await page.getByRole("button", { name: "Add friend" }).click();
-  await expect(page.getByText(/was added/)).toBeVisible();
-
-  await page.getByLabel("Email or mobile number").fill(dupEmail);
-  await page.getByRole("button", { name: "Add friend" }).click();
-  await expect(page.getByText(/was added/)).toBeVisible();
+  await addFriend(page, dupPhone);
+  await addFriend(page, dupEmail);
 
   // Two distinct friends on the list.
   await page.goto("/friends");

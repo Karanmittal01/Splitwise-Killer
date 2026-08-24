@@ -54,6 +54,55 @@ const SPLIT_TABS: { id: SplitMethod; label: string; hint: string }[] = [
   { id: "ADJUSTMENT", label: "+/−", hint: "Equally, with adjustments" },
 ];
 
+/**
+ * The four ways two people actually settle a bill, in plain words.
+ *
+ * The split tabs below (exact amounts, percentages, shares) can express all of
+ * these, but only by combining a payer dropdown with a method and a pair of
+ * numbers — three controls to say "I owe Kunal ₹33,000". These say it in one
+ * tap, and they cover nearly every one-on-one expense.
+ *
+ * Order runs from "they owe most" to "I owe most" so the list reads as a
+ * spectrum rather than four unrelated buttons.
+ */
+type Preset = "THEY_OWE_ALL" | "EQUAL_THEY_PAID" | "EQUAL_I_PAID" | "I_OWE_ALL";
+
+const PRESET_ORDER: Preset[] = ["THEY_OWE_ALL", "EQUAL_THEY_PAID", "EQUAL_I_PAID", "I_OWE_ALL"];
+
+/**
+ * Which preset the current payer/method/values add up to, or null if the split
+ * is something the four options can't say.
+ *
+ * "Entire amount" is stored as SHARES 1/0 rather than EXACT amounts on purpose:
+ * shares don't mention the total, so choosing the option before typing the
+ * amount still works, and editing the amount afterwards doesn't strand a stale
+ * figure in the split.
+ */
+function presetOf(state: {
+  selfId: string;
+  otherId: string;
+  payerId: string;
+  splitMethod: SplitMethod;
+  values: Record<string, string>;
+}): Preset | null {
+  const { selfId, otherId, payerId, splitMethod, values } = state;
+
+  if (splitMethod === "EQUAL") {
+    if (payerId === selfId) return "EQUAL_I_PAID";
+    if (payerId === otherId) return "EQUAL_THEY_PAID";
+    return null;
+  }
+
+  if (splitMethod === "SHARES") {
+    const mine = (values[selfId] ?? "").trim();
+    const theirs = (values[otherId] ?? "").trim();
+    if (mine === "0" && theirs === "1" && payerId === selfId) return "THEY_OWE_ALL";
+    if (mine === "1" && theirs === "0" && payerId === otherId) return "I_OWE_ALL";
+  }
+
+  return null;
+}
+
 function personName(person: FormPerson, selfId: string): string {
   if (person.id === selfId) return "You";
   return person.name?.trim() || person.email?.split("@")[0] || person.phone || "Someone";
@@ -216,6 +265,86 @@ export function ExpenseForm({
 
   const splitHint = SPLIT_TABS.find((t) => t.id === splitMethod)?.hint ?? "";
 
+  // One-on-one is the common case and gets plain-language options; groups keep
+  // the payer dropdown and the split tabs, which is where they earn their keep.
+  const [advanced, setAdvanced] = useState(false);
+  const other =
+    participants.length === 2 && participants.some((p) => p.id === self.id)
+      ? (participants.find((p) => p.id !== self.id) ?? null)
+      : null;
+
+  const activePreset = other
+    ? presetOf({
+        selfId: self.id,
+        otherId: other.id,
+        payerId: payer,
+        splitMethod,
+        values,
+      })
+    : null;
+
+  const simple = Boolean(other) && !multiPayer && !advanced && activePreset !== null;
+
+  function applyPreset(preset: Preset, otherId: string) {
+    setMultiPayer(false);
+    switch (preset) {
+      case "THEY_OWE_ALL":
+        setSplitMethod("SHARES");
+        setPayer(self.id);
+        setValues({ [self.id]: "0", [otherId]: "1" });
+        break;
+      case "EQUAL_THEY_PAID":
+        setSplitMethod("EQUAL");
+        setPayer(otherId);
+        setValues({});
+        break;
+      case "EQUAL_I_PAID":
+        setSplitMethod("EQUAL");
+        setPayer(self.id);
+        setValues({});
+        break;
+      case "I_OWE_ALL":
+        setSplitMethod("SHARES");
+        setPayer(otherId);
+        setValues({ [self.id]: "1", [otherId]: "0" });
+        break;
+    }
+  }
+
+  /** The half of the total, or the whole of it, spelled out when known. */
+  function presetDetail(preset: Preset, name: string): string {
+    if (!validTotal) {
+      return preset === "EQUAL_I_PAID" || preset === "EQUAL_THEY_PAID"
+        ? "half each"
+        : "nothing owed the other way";
+    }
+    const half = formatMoney(Math.round(totalCents / 2), currency);
+    const full = formatMoney(totalCents, currency);
+    switch (preset) {
+      case "THEY_OWE_ALL":
+        return `${name} owes you ${full}`;
+      case "EQUAL_THEY_PAID":
+        return `${half} each — you owe ${name} ${half}`;
+      case "EQUAL_I_PAID":
+        return `${half} each — ${name} owes you ${half}`;
+      case "I_OWE_ALL":
+        return `you owe ${name} ${full}`;
+    }
+  }
+
+  function presetLabel(preset: Preset, name: string): string {
+    switch (preset) {
+      case "THEY_OWE_ALL":
+        return `${name} owes the entire amount`;
+      case "EQUAL_THEY_PAID":
+        return `Split equally · ${name} paid`;
+      case "EQUAL_I_PAID":
+        return "Split equally · I paid";
+      case "I_OWE_ALL":
+        return `I owe ${name} the entire amount`;
+    }
+  }
+
   // React picks the form encoding itself for server actions (files included),
   // so no encType here.
   return (
@@ -370,135 +499,204 @@ export function ExpenseForm({
         )}
       </section>
 
-      {/* ---------------- Paid by ---------------- */}
-      <section className="card p-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <span className="label mb-0">Paid by</span>
-          <label className="flex items-center gap-2 text-sm muted">
-            <input
-              type="checkbox"
-              checked={multiPayer}
-              onChange={(e) => setMultiPayer(e.target.checked)}
-              className="h-4 w-4 accent-[var(--color-mint-600)]"
-            />
-            More than one person paid
-          </label>
-        </div>
+      {/* ---------------- Who owes what (one-on-one) ---------------- */}
+      {simple && other && (
+        <section className="card p-4">
+          <span className="label">Who owes what</span>
 
-        {multiPayer ? (
-          <>
-            <div className="divide-row">
-              {participants.map((person) => (
-                <div key={person.id} className="flex items-center gap-3 py-2">
-                  <Avatar id={person.id} name={personName(person, self.id)} image={person.image} size={30} />
-                  <span className="min-w-0 flex-1 truncate text-sm">
-                    {personName(person, self.id)}
+          <div className="flex flex-col gap-2">
+            {PRESET_ORDER.map((preset) => {
+              const name = personName(other, self.id);
+              const on = activePreset === preset;
+              return (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => applyPreset(preset, other.id)}
+                  aria-pressed={on}
+                  className={`rounded-xl border px-3 py-3 text-left transition-colors ${
+                    on
+                      ? "border-[var(--color-mint-400)] bg-[var(--brand-soft)]"
+                      : "border-[var(--surface-border)] hover:bg-[var(--surface-raised)]"
+                  }`}
+                >
+                  <span
+                    className={`block text-sm font-semibold ${on ? "text-[var(--brand)]" : ""}`}
+                  >
+                    {presetLabel(preset, name)}
                   </span>
-                  <input
-                    className="field w-32 text-right tabular-nums"
-                    inputMode="decimal"
-                    placeholder="0.00"
-                    value={payerAmounts[person.id] ?? ""}
-                    onChange={(e) =>
-                      setPayerAmounts((prev) => ({ ...prev, [person.id]: e.target.value }))
-                    }
-                  />
-                </div>
-              ))}
-            </div>
-            <RemainderBar
-              label="paid"
-              currentCents={paidTotal}
-              totalCents={validTotal ? totalCents : 0}
-              currency={currency}
-            />
-          </>
-        ) : (
-          <select className="field" value={payer} onChange={(e) => setPayer(e.target.value)}>
-            {participants.map((person) => (
-              <option key={person.id} value={person.id}>
-                {personName(person, self.id)}
-              </option>
-            ))}
-          </select>
-        )}
-      </section>
+                  <span className="mt-0.5 block text-xs muted">
+                    {presetDetail(preset, name)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
 
-      {/* ---------------- Split method ---------------- */}
-      <section className="card p-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <span className="label mb-0">How to split</span>
-          <span className="text-xs muted">{splitHint}</span>
-        </div>
+          <button
+            type="button"
+            onClick={() => setAdvanced(true)}
+            className="mt-3 text-sm font-semibold text-[var(--brand)] hover:underline"
+          >
+            Something else…
+          </button>
+          <p className="mt-1 text-xs muted">
+            Exact amounts, percentages, shares, or more than one person paying.
+          </p>
+        </section>
+      )}
 
-        <div className="mb-4 flex gap-1 rounded-xl bg-[var(--surface-raised)] p-1">
-          {SPLIT_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              title={tab.hint}
-              onClick={() => setSplitMethod(tab.id)}
-              className={`flex-1 rounded-lg px-2 py-2 text-sm font-semibold transition-colors ${
-                splitMethod === tab.id
-                  ? "bg-[var(--surface-card)] text-[var(--brand)] shadow-sm"
-                  : "muted hover:text-[var(--text-strong)]"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+      {/* The payer dropdown and the split tabs. In a one-on-one these are
+          folded into the four options above; groups and custom splits still
+          need them. */}
+      {!simple && (
+        <>
+        {/* ---------------- Paid by ---------------- */}
+        <section className="card p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <span className="label mb-0">Paid by</span>
+            <label className="flex items-center gap-2 text-sm muted">
+              <input
+                type="checkbox"
+                checked={multiPayer}
+                onChange={(e) => setMultiPayer(e.target.checked)}
+                className="h-4 w-4 accent-[var(--color-mint-600)]"
+              />
+              More than one person paid
+            </label>
+          </div>
 
-        <div className="divide-row">
-          {participants.map((person) => {
-            const owed = preview?.owed.get(person.id);
-            return (
-              <div key={person.id} className="flex items-center gap-3 py-2.5">
-                <Avatar id={person.id} name={personName(person, self.id)} image={person.image} size={32} />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{personName(person, self.id)}</p>
-                  {owed !== undefined && (
-                    <p className="text-xs muted">owes {formatMoney(owed, currency)}</p>
-                  )}
-                </div>
-
-                {splitMethod !== "EQUAL" && (
-                  <div className="flex items-center gap-1">
-                    {splitMethod === "ADJUSTMENT" && <span className="text-sm muted">+</span>}
+          {multiPayer ? (
+            <>
+              <div className="divide-row">
+                {participants.map((person) => (
+                  <div key={person.id} className="flex items-center gap-3 py-2">
+                    <Avatar id={person.id} name={personName(person, self.id)} image={person.image} size={30} />
+                    <span className="min-w-0 flex-1 truncate text-sm">
+                      {personName(person, self.id)}
+                    </span>
                     <input
-                      className="field w-28 text-right tabular-nums"
+                      className="field w-32 text-right tabular-nums"
                       inputMode="decimal"
-                      placeholder={splitMethod === "SHARES" ? "1" : "0"}
-                      value={values[person.id] ?? ""}
+                      placeholder="0.00"
+                      value={payerAmounts[person.id] ?? ""}
                       onChange={(e) =>
-                        setValues((prev) => ({ ...prev, [person.id]: e.target.value }))
+                        setPayerAmounts((prev) => ({ ...prev, [person.id]: e.target.value }))
                       }
                     />
-                    {splitMethod === "PERCENT" && <span className="text-sm muted">%</span>}
                   </div>
-                )}
+                ))}
               </div>
-            );
-          })}
-        </div>
+              <RemainderBar
+                label="paid"
+                currentCents={paidTotal}
+                totalCents={validTotal ? totalCents : 0}
+                currency={currency}
+              />
+            </>
+          ) : (
+            <select className="field" value={payer} onChange={(e) => setPayer(e.target.value)}>
+              {participants.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {personName(person, self.id)}
+                </option>
+              ))}
+            </select>
+          )}
+        </section>
 
-        {participants.length === 0 && (
-          <p className="py-3 text-sm muted">Pick at least one person above.</p>
-        )}
+        {/* ---------------- Split method ---------------- */}
+        <section className="card p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <span className="label mb-0">How to split</span>
+            <span className="text-xs muted">{splitHint}</span>
+          </div>
 
-        {preview?.error && (
-          <p className="mt-3 rounded-xl bg-[var(--color-coral-50)] px-3 py-2 text-sm text-[var(--color-coral-700)] dark:bg-[#3a1d15] dark:text-[var(--color-coral-300)]">
-            {preview.error}
-          </p>
-        )}
+          <div className="mb-4 flex gap-1 rounded-xl bg-[var(--surface-raised)] p-1">
+            {SPLIT_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                title={tab.hint}
+                onClick={() => setSplitMethod(tab.id)}
+                className={`flex-1 rounded-lg px-2 py-2 text-sm font-semibold transition-colors ${
+                  splitMethod === tab.id
+                    ? "bg-[var(--surface-card)] text-[var(--brand)] shadow-sm"
+                    : "muted hover:text-[var(--text-strong)]"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
-        {splitMethod === "EQUAL" && validTotal && participants.length > 0 && (
-          <p className="mt-3 text-sm muted">
-            {formatMoney(Math.floor(totalCents / participants.length), currency)} each
-            {totalCents % participants.length !== 0 && " (the odd cents go to the first names)"}
-          </p>
-        )}
-      </section>
+          <div className="divide-row">
+            {participants.map((person) => {
+              const owed = preview?.owed.get(person.id);
+              return (
+                <div key={person.id} className="flex items-center gap-3 py-2.5">
+                  <Avatar id={person.id} name={personName(person, self.id)} image={person.image} size={32} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{personName(person, self.id)}</p>
+                    {owed !== undefined && (
+                      <p className="text-xs muted">owes {formatMoney(owed, currency)}</p>
+                    )}
+                  </div>
+
+                  {splitMethod !== "EQUAL" && (
+                    <div className="flex items-center gap-1">
+                      {splitMethod === "ADJUSTMENT" && <span className="text-sm muted">+</span>}
+                      <input
+                        className="field w-28 text-right tabular-nums"
+                        inputMode="decimal"
+                        placeholder={splitMethod === "SHARES" ? "1" : "0"}
+                        value={values[person.id] ?? ""}
+                        onChange={(e) =>
+                          setValues((prev) => ({ ...prev, [person.id]: e.target.value }))
+                        }
+                      />
+                      {splitMethod === "PERCENT" && <span className="text-sm muted">%</span>}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {participants.length === 0 && (
+            <p className="py-3 text-sm muted">Pick at least one person above.</p>
+          )}
+
+          {preview?.error && (
+            <p className="mt-3 rounded-xl bg-[var(--color-coral-50)] px-3 py-2 text-sm text-[var(--color-coral-700)] dark:bg-[#3a1d15] dark:text-[var(--color-coral-300)]">
+              {preview.error}
+            </p>
+          )}
+
+          {splitMethod === "EQUAL" && validTotal && participants.length > 0 && (
+            <p className="mt-3 text-sm muted">
+              {formatMoney(Math.floor(totalCents / participants.length), currency)} each
+              {totalCents % participants.length !== 0 && " (the odd cents go to the first names)"}
+            </p>
+          )}
+
+          {other && advanced && (
+            <button
+              type="button"
+              onClick={() => {
+                // Going back *means* picking one of the four, so land on a
+                // sensible one rather than showing the list with nothing chosen.
+                if (!activePreset) applyPreset("EQUAL_I_PAID", other.id);
+                setAdvanced(false);
+              }}
+              className="mt-4 text-sm font-semibold text-[var(--brand)] hover:underline"
+            >
+              ← Back to the simple options
+            </button>
+          )}
+        </section>
+        </>
+      )}
 
       {/* ---------------- More options ---------------- */}
       <section className="card p-4">

@@ -88,6 +88,10 @@ test("an expense can have more than one payer", async ({ page }) => {
 
   await page.getByLabel("Description").fill("Weekend groceries");
   await page.getByLabel("Amount").fill("1000");
+
+  // Two people, so the four plain-language options are showing. Two payers is
+  // one of the things that lives behind "Something else".
+  await page.getByRole("button", { name: "Something else…" }).click();
   await page.getByLabel("More than one person paid").check();
 
   // Scope to the "Paid by" card — the amount field shares the 0.00 placeholder.
