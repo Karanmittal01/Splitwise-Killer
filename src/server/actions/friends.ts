@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { recordActivity } from "@/lib/activity";
@@ -9,8 +10,10 @@ import {
   createInvitation,
   ensureFriendship,
   findOrCreatePerson,
+  mergeUsers,
   normaliseEmail,
   normalisePhone,
+  phoneVariants,
 } from "@/lib/people";
 import { sendInviteEmail } from "@/lib/notify";
 import { fail, succeed, type ActionState } from "./types";
@@ -247,4 +250,108 @@ export async function importContactsAction(
 
   revalidatePath("/friends");
   return result;
+}
+
+/**
+ * Add an email or mobile number to an existing (placeholder) friend.
+ *
+ * If that detail already belongs to another person you know, the two are the
+ * same human entered twice — so the profiles are merged into one, keeping a
+ * real (signed-in) account over a placeholder, and folding every shared
+ * expense, group and note together. Otherwise the detail is simply saved.
+ */
+export async function addFriendContactAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireUser();
+  const friendId = String(formData.get("friendId") ?? "");
+  const handle = String(formData.get("handle") ?? "").trim();
+
+  const email = normaliseEmail(handle);
+  const phone = email ? null : normalisePhone(handle);
+  if (!email && !phone) return fail("Enter a valid email address or mobile number.");
+
+  const friendship = await prisma.friendship.findUnique({
+    where: { userId_friendId: { userId: user.id, friendId } },
+    select: { id: true },
+  });
+  if (!friendship) return fail("They're not on your friends list.");
+
+  const friend = await prisma.user.findUnique({
+    where: { id: friendId },
+    select: { id: true, email: true, phone: true, isPlaceholder: true },
+  });
+  if (!friend) return fail("That person no longer exists.");
+
+  // Already recorded on this friend — nothing to do.
+  if (email && friend.email === email) return succeed("That email is already saved.");
+  if (phone && friend.phone && phoneVariants(handle).includes(friend.phone)) {
+    return succeed("That number is already saved.");
+  }
+
+  // Does anybody else already hold this detail?
+  const other = await prisma.user.findFirst({
+    where: {
+      id: { not: friendId },
+      OR: [...(email ? [{ email }] : []), ...(phone ? [{ phone: { in: phoneVariants(handle) } }] : [])],
+    },
+    select: { id: true, isPlaceholder: true },
+  });
+
+  if (other) {
+    if (other.id === user.id) {
+      return fail("That's your own contact — you can't merge a friend into yourself.");
+    }
+    if (!other.isPlaceholder && !friend.isPlaceholder) {
+      return fail("Both are full accounts, so they can't be merged.");
+    }
+    // A real account can only be merged into if it's already your friend —
+    // you can't attach expenses to a stranger's account by guessing an email.
+    if (!other.isPlaceholder) {
+      const knowOther = await prisma.friendship.findUnique({
+        where: { userId_friendId: { userId: user.id, friendId: other.id } },
+        select: { id: true },
+      });
+      if (!knowOther) {
+        return fail("That email or number belongs to someone who isn't your friend yet.");
+      }
+    }
+
+    // Keep the real account when there is one; otherwise keep the friend being
+    // edited. mergeUsers requires the source to be a placeholder, which every
+    // branch below satisfies.
+    const [sourceId, targetId] =
+      friend.isPlaceholder && !other.isPlaceholder
+        ? [friend.id, other.id]
+        : [other.id, friend.id];
+
+    try {
+      await mergeUsers(sourceId, targetId);
+    } catch (error) {
+      if (error instanceof PeopleError) return fail(error.message);
+      return fail("Could not merge those profiles.");
+    }
+
+    await ensureFriendship(user.id, targetId);
+    revalidatePath("/friends");
+    revalidatePath("/dashboard");
+    // Land on whichever profile survived.
+    redirect(`/friends/${targetId}`);
+  }
+
+  // No duplicate: just record the detail. Only a placeholder can take one —
+  // a signed-in account owns its own email and phone.
+  if (!friend.isPlaceholder) {
+    return fail("This friend has their own account and manages their own contact details.");
+  }
+
+  await prisma.user.update({
+    where: { id: friend.id },
+    data: email ? { email } : { phone },
+  });
+
+  revalidatePath(`/friends/${friendId}`);
+  revalidatePath("/friends");
+  return succeed(email ? "Email saved." : "Mobile number saved.");
 }

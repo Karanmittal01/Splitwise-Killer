@@ -214,6 +214,11 @@ export async function mergeUsers(sourceId: string, targetId: string): Promise<vo
       where: { targetUserId: sourceId },
       data: { targetUserId: targetId },
     });
+    // Private notes tagged to the merged-away person now point at the survivor.
+    await tx.personalNote.updateMany({
+      where: { aboutUserId: sourceId },
+      data: { aboutUserId: targetId },
+    });
 
     // Activity fan-out rows: move across, ignoring rows the target already has.
     const audience = await tx.activityAudience.findMany({ where: { userId: sourceId } });
@@ -225,13 +230,14 @@ export async function mergeUsers(sourceId: string, targetId: string): Promise<vo
       else await tx.activityAudience.update({ where: { id: row.id }, data: { userId: targetId } });
     }
 
-    // Carry over contact details the real account is missing.
+    // Carry over any contact details the survivor is missing.
     const target = await tx.user.findUnique({
       where: { id: targetId },
-      select: { phone: true, name: true },
+      select: { phone: true, name: true, email: true },
     });
     const patch: Record<string, string> = {};
     if (source.phone && !target?.phone) patch.phone = source.phone;
+    if (source.email && !target?.email) patch.email = source.email;
     if (source.name && !target?.name) patch.name = source.name;
 
     // Free up the unique email/phone before the target claims them.

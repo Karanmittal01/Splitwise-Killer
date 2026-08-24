@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EmptyState, PageHeader } from "@/components/AppShell";
 import { ActionForm } from "@/components/ActionForm";
+import { AddFriendContact } from "@/components/AddFriendContact";
 import { ExpenseList } from "@/components/ExpenseList";
 import { Money } from "@/components/Money";
 import { FriendNameHeading } from "@/components/FriendNameHeading";
@@ -136,18 +137,29 @@ export default async function FriendPage({ params }: { params: Promise<{ id: str
         />
       </div>
 
-      {person.isPlaceholder && invite && (
-        <div className="card mb-5 flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold">{name} hasn&apos;t signed in yet</p>
-            <p className="text-xs muted">Send them a link — they sign in with Google to see their share.</p>
-          </div>
-          <ShareInvite
-            link={inviteLink(invite.token)}
-            name={name}
-            phone={person.phone}
-            email={invite.email ?? person.email}
-            compact
+      {person.isPlaceholder && (
+        <div className="card mb-5 flex flex-col gap-3 px-4 py-3">
+          {invite && (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold">{name} hasn&apos;t signed in yet</p>
+                <p className="text-xs muted">
+                  Send them a link — they sign in with Google to see their share.
+                </p>
+              </div>
+              <ShareInvite
+                link={inviteLink(invite.token)}
+                name={name}
+                phone={person.phone}
+                email={invite.email ?? person.email}
+                compact
+              />
+            </div>
+          )}
+          <AddFriendContact
+            friendId={person.id}
+            hasEmail={Boolean(person.email)}
+            hasPhone={Boolean(person.phone)}
           />
         </div>
       )}
