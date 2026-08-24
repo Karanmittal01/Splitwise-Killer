@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Avatar } from "./Avatar";
 import { NavLink, TabLink } from "./NavLink";
+import { MobileMenu } from "./MobileMenu";
 import type { CurrentUser } from "@/lib/session";
 import { displayName } from "@/lib/session";
 import { BrandMark } from "./BrandMark";
@@ -79,9 +80,12 @@ export function AppShell({
             <BrandMark size={32} />
             <span className="font-bold">Splitwise Killer</span>
           </Link>
-          <Link href="/account">
-            <Avatar id={user.id} name={displayName(user)} image={user.image} size={30} />
-          </Link>
+          <MobileMenu
+            userId={user.id}
+            name={displayName(user)}
+            email={user.email}
+            image={user.image}
+          />
         </header>
 
         <main className="min-w-0 flex-1 px-4 pt-4 pb-28 md:px-8 md:pt-8 md:pb-12">{children}</main>
