@@ -80,26 +80,30 @@ test("an email that already has an account can't be signed up twice", async ({ p
   await expect(page.getByText(/already has an account/)).toBeVisible();
 });
 
-test("a password shorter than the rule is refused before an account exists", async ({ page }) => {
-  const email = freshEmail("short");
+test("a weak password is refused, by the browser and by the server", async ({ page }) => {
+  const email = freshEmail("weak");
 
   await goToLogin(page);
   await page.getByRole("tab", { name: "Create account" }).click();
-  await page.getByLabel("Your name").fill("Too Short");
+  await page.getByLabel("Your name").fill("Too Weak");
   await page.getByLabel("Email", { exact: true }).fill(email);
-  // The field has minLength too, so bypass the browser's own check to be sure
-  // the server is the one saying no.
-  await page.getByLabel("Password", { exact: true }).fill("short");
-  await page.getByLabel("Password", { exact: true }).evaluate((el) => {
-    (el as HTMLInputElement).minLength = 0;
-  });
+
+  // Layer one: the field's own minLength stops a short password before any
+  // request is made.
+  const field = page.getByLabel("Password", { exact: true });
+  await field.fill("short");
+  await expect(field).toHaveJSProperty("validity.valid", false);
+
+  // Layer two: something the browser is perfectly happy with — eight
+  // characters — that the server still refuses. Only the server can know this.
+  await field.fill("password");
+  await expect(field).toHaveJSProperty("validity.valid", true);
   await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByText(/first anyone would try/)).toBeVisible();
 
-  await expect(page.getByText(/at least 8 characters/i)).toBeVisible();
-
-  // And nothing was created — the same email is still free.
+  // Nothing was created either time — the same email is still free.
   await goToLogin(page);
-  await createAccount(page, "Too Short", email);
+  await createAccount(page, "Too Weak", email);
   await page.waitForURL("**/dashboard");
 });
 

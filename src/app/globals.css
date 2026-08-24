@@ -194,6 +194,19 @@ body {
   background: var(--surface-raised);
 }
 
+/* Destructive actions. Same weight as a secondary button — it should not be
+   the loudest thing on the screen — but unmistakably red. */
+.btn-danger {
+  background: var(--surface-card);
+  color: var(--negative);
+  border: 1px solid var(--surface-border);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--surface-raised);
+  border-color: var(--negative);
+}
+
 .btn-ghost {
   background: transparent;
   color: var(--text-muted);

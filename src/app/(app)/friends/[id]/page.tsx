@@ -12,7 +12,7 @@ import { SubmitButton } from "@/components/form";
 import { prisma } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 import { inviteLink } from "@/lib/people";
-import { getNicknames, getSharedExpenses, userPairBalances } from "@/lib/queries";
+import { getFriendPhotos, getNicknames, getSharedExpenses, userPairBalances } from "@/lib/queries";
 import { displayName, requireUser } from "@/lib/session";
 import { removeFriendAction } from "@/server/actions/friends";
 
@@ -35,7 +35,7 @@ export default async function FriendPage({ params }: { params: Promise<{ id: str
   });
   if (!person) notFound();
 
-  const [expenses, pairs, invite, nicknames] = await Promise.all([
+  const [expenses, pairs, invite, nicknames, photos] = await Promise.all([
     getSharedExpenses(user.id, person.id),
     userPairBalances(user.id),
     person.isPlaceholder
@@ -46,11 +46,17 @@ export default async function FriendPage({ params }: { params: Promise<{ id: str
         })
       : Promise.resolve(null),
     getNicknames(user.id),
+    getFriendPhotos(user.id),
   ]);
 
   const nickname = nicknames.get(person.id) ?? null;
   const realName = displayName(person);
   const name = nickname ?? realName;
+
+  // A picture you uploaded for them wins over whatever their own account has —
+  // it is your view of them, the same way the nickname is.
+  const myPhoto = photos.get(person.id) ?? null;
+  const face = myPhoto ?? person.image;
 
   const balances: { currency: string; netCents: number }[] = [];
   for (const [currency, bucket] of pairs) {
@@ -99,7 +105,8 @@ export default async function FriendPage({ params }: { params: Promise<{ id: str
             name={name}
             realName={realName}
             nickname={nickname}
-            image={person.image}
+            image={face}
+            hasOwnPhoto={Boolean(myPhoto)}
             email={person.email}
             phone={person.phone}
           />

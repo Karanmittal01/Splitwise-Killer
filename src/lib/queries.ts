@@ -40,14 +40,44 @@ export const getNicknames = cache(async (userId: string): Promise<Map<string, st
   return new Map(rows.map((row) => [row.friendId, row.nickname!]));
 });
 
-function renamed<T extends { id: string; name: string | null }>(
+/**
+ * The pictures this user has uploaded for other people, as ready-to-use URLs.
+ *
+ * Like nicknames, these are private to the uploader — see the FriendPhoto model.
+ * The ?v stamp is the row's updatedAt, so the URL changes whenever the picture
+ * does and can otherwise be cached hard.
+ */
+export const getFriendPhotos = cache(async (userId: string): Promise<Map<string, string>> => {
+  const rows = await prisma.friendPhoto.findMany({
+    where: { ownerId: userId },
+    select: { friendId: true, updatedAt: true },
+  });
+  return new Map(
+    rows.map((row) => [row.friendId, `/api/avatars/friend/${row.friendId}?v=${row.updatedAt.getTime()}`]),
+  );
+});
+
+/**
+ * Both private overlays in one pass: your name for somebody, and your picture
+ * of them. Applied at the query layer so every screen gets them without each
+ * component having to remember.
+ */
+function personalise<T extends { id: string; name: string | null; image?: string | null }>(
   people: T[],
   nicknames: Map<string, string>,
+  photos: Map<string, string> = new Map(),
 ): T[] {
-  if (nicknames.size === 0) return people;
-  return people.map((person) =>
-    nicknames.has(person.id) ? { ...person, name: nicknames.get(person.id)! } : person,
-  );
+  if (nicknames.size === 0 && photos.size === 0) return people;
+  return people.map((person) => {
+    const nickname = nicknames.get(person.id);
+    const photo = photos.get(person.id);
+    if (!nickname && !photo) return person;
+    return {
+      ...person,
+      ...(nickname ? { name: nickname } : {}),
+      ...(photo ? { image: photo } : {}),
+    };
+  });
 }
 
 const expenseForBalance = {
@@ -141,12 +171,13 @@ export async function getDashboard(userId: string) {
   const peopleIds = new Set<string>();
   for (const bucket of pairs.values()) for (const id of bucket.keys()) peopleIds.add(id);
 
-  const [rawPeople, groups, nicknames] = await Promise.all([
+  const [rawPeople, groups, nicknames, photos] = await Promise.all([
     prisma.user.findMany({ where: { id: { in: [...peopleIds] } }, select: personSelect }),
     getUserGroupsWithBalances(userId),
     getNicknames(userId),
+    getFriendPhotos(userId),
   ]);
-  const peopleById = new Map(renamed(rawPeople, nicknames).map((p) => [p.id, p]));
+  const peopleById = new Map(personalise(rawPeople, nicknames, photos).map((p) => [p.id, p]));
 
   const totals: DashboardTotals = [];
   const perPerson: {
@@ -242,7 +273,7 @@ export async function getUserGroupsWithBalances(
 }
 
 export async function getGroupOrThrow(groupId: string, userId: string) {
-  const nicknames = await getNicknames(userId);
+  const [nicknames, photos] = await Promise.all([getNicknames(userId), getFriendPhotos(userId)]);
   const group = await prisma.group.findFirst({
     where: { id: groupId, members: { some: { userId } } },
     include: {
@@ -254,13 +285,15 @@ export async function getGroupOrThrow(groupId: string, userId: string) {
   });
   if (!group) return null;
 
+  const members = personalise(
+    group.members.map((membership) => membership.user),
+    nicknames,
+    photos,
+  );
+
   return {
     ...group,
-    members: group.members.map((membership) =>
-      nicknames.has(membership.user.id)
-        ? { ...membership, user: { ...membership.user, name: nicknames.get(membership.user.id)! } }
-        : membership,
-    ),
+    members: group.members.map((membership, index) => ({ ...membership, user: members[index] })),
   };
 }
 
@@ -334,20 +367,24 @@ export async function getSharedExpenses(
 }
 
 export async function getFriendsWithBalances(userId: string) {
-  const [friendships, pairs, nicknames] = await Promise.all([
+  const [friendships, pairs, nicknames, photos] = await Promise.all([
     prisma.friendship.findMany({
       where: { userId },
       include: { friend: { select: personSelect } },
     }),
     userPairBalances(userId),
     getNicknames(userId),
+    getFriendPhotos(userId),
   ]);
 
   const balanceIds = new Set<string>();
   for (const bucket of pairs.values()) for (const id of bucket.keys()) balanceIds.add(id);
 
   const known = new Map(
-    renamed(friendships.map((f) => f.friend), nicknames).map((friend) => [friend.id, friend]),
+    personalise(friendships.map((f) => f.friend), nicknames, photos).map((friend) => [
+      friend.id,
+      friend,
+    ]),
   );
   const missingIds = [...balanceIds].filter((id) => !known.has(id));
   if (missingIds.length > 0) {
@@ -355,7 +392,7 @@ export async function getFriendsWithBalances(userId: string) {
       where: { id: { in: missingIds } },
       select: personSelect,
     });
-    for (const person of renamed(extra, nicknames)) known.set(person.id, person);
+    for (const person of personalise(extra, nicknames, photos)) known.set(person.id, person);
   }
 
   const rows = [...known.values()].map((person) => {
@@ -453,11 +490,11 @@ export async function getConnections(userId: string): Promise<PersonRef[]> {
     }),
   ]);
 
-  const nicknames = await getNicknames(userId);
+  const [nicknames, photos] = await Promise.all([getNicknames(userId), getFriendPhotos(userId)]);
   const byId = new Map<string, PersonRef>();
   for (const row of friends) byId.set(row.friend.id, row.friend);
   for (const person of coMembers) byId.set(person.id, person);
-  return renamed([...byId.values()], nicknames).sort((a, b) =>
+  return personalise([...byId.values()], nicknames, photos).sort((a, b) =>
     (a.name ?? "").localeCompare(b.name ?? ""),
   );
 }

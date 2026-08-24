@@ -6,7 +6,7 @@ import { NetLine, NoteList } from "@/components/NoteList";
 import { prisma } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 import { summariseNotes } from "@/lib/notes";
-import { getNicknames } from "@/lib/queries";
+import { getFriendPhotos, getNicknames } from "@/lib/queries";
 import { displayName, requireUser } from "@/lib/session";
 
 export const metadata = { title: "Notes about a friend" };
@@ -22,7 +22,7 @@ export default async function NotesPersonPage({ params }: { params: Promise<{ id
   const { id } = await params;
   const user = await requireUser();
 
-  const [notes, nicknames] = await Promise.all([
+  const [notes, nicknames, photos] = await Promise.all([
     prisma.personalNote.findMany({
       where: { userId: user.id, aboutUserId: id },
       include: {
@@ -32,6 +32,7 @@ export default async function NotesPersonPage({ params }: { params: Promise<{ id
       take: 300,
     }),
     getNicknames(user.id),
+    getFriendPhotos(user.id),
   ]);
 
   // Scoped to this owner's own notes, so an id that isn't theirs simply has
@@ -40,6 +41,7 @@ export default async function NotesPersonPage({ params }: { params: Promise<{ id
   if (!person) notFound();
 
   const name = nicknames.get(person.id) ?? displayName(person);
+  const face = photos.get(person.id) ?? person.image;
   const totals = summariseNotes(notes);
 
   return (
@@ -47,7 +49,7 @@ export default async function NotesPersonPage({ params }: { params: Promise<{ id
       <PageHeader
         title={
           <span className="flex min-w-0 items-center gap-3">
-            <Avatar id={person.id} name={name} image={person.image} size={44} />
+            <Avatar id={person.id} name={name} image={face} size={44} />
             <span className="truncate">{name}</span>
           </span>
         }

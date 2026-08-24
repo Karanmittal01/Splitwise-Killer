@@ -1,10 +1,8 @@
-import { ActionForm } from "./ActionForm";
+import Link from "next/link";
 import { Avatar } from "./Avatar";
-import { SubmitButton } from "./form";
 import { category } from "@/lib/categories";
 import { formatMoney } from "@/lib/money";
 import type { NoteTotals } from "@/lib/notes";
-import { deleteNoteAction } from "@/server/actions/notes";
 
 export const DIRECTION_LABELS: Record<string, string> = {
   GAVE: "You gave",
@@ -59,7 +57,14 @@ export function NoteList({
               const cat = category(note.category);
               const who = note.about ? nameFor(note.about.id) : null;
               return (
-                <div key={note.id} className="flex items-center gap-3 px-3 py-3 sm:px-4">
+                // The whole row opens the note. Deleting lives in there, behind
+                // a deliberate tap, rather than sitting under your thumb in a
+                // list you are only scrolling through.
+                <Link
+                  key={note.id}
+                  href={`/notes/${note.id}`}
+                  className="flex items-center gap-3 px-3 py-3 transition-colors hover:bg-[var(--surface-raised)] sm:px-4"
+                >
                   <div className="w-9 shrink-0 text-center">
                     <p className="text-[11px] font-semibold muted uppercase">
                       {dayFormat.format(note.date)}
@@ -85,22 +90,13 @@ export function NoteList({
                     </p>
                   </div>
 
-                  <div className="shrink-0 text-right">
-                    <p className="tabular-nums font-semibold">
-                      {formatMoney(note.amountCents, note.currency)}
-                    </p>
-                    <ActionForm
-                      action={deleteNoteAction}
-                      confirm="Delete this note?"
-                      messagePosition="none"
-                    >
-                      <input type="hidden" name="noteId" value={note.id} />
-                      <SubmitButton className="btn btn-ghost px-1 text-[11px]" pendingLabel="…">
-                        Delete
-                      </SubmitButton>
-                    </ActionForm>
-                  </div>
-                </div>
+                  <p className="shrink-0 tabular-nums font-semibold">
+                    {formatMoney(note.amountCents, note.currency)}
+                  </p>
+                  <span aria-hidden className="shrink-0 text-lg muted">
+                    ›
+                  </span>
+                </Link>
               );
             })}
           </div>

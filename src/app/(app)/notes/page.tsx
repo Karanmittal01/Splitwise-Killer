@@ -5,7 +5,7 @@ import { NetLine, NoteList } from "@/components/NoteList";
 import { prisma } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 import { groupNotesByPerson, summariseNotes } from "@/lib/notes";
-import { getNicknames } from "@/lib/queries";
+import { getFriendPhotos, getNicknames } from "@/lib/queries";
 import { displayName, requireUser } from "@/lib/session";
 
 export const metadata = { title: "Personal notes" };
@@ -13,7 +13,7 @@ export const metadata = { title: "Personal notes" };
 export default async function NotesPage() {
   const user = await requireUser();
 
-  const [notes, nicknames] = await Promise.all([
+  const [notes, nicknames, photos] = await Promise.all([
     prisma.personalNote.findMany({
       where: { userId: user.id },
       include: {
@@ -23,6 +23,7 @@ export default async function NotesPage() {
       take: 300,
     }),
     getNicknames(user.id),
+    getFriendPhotos(user.id),
   ]);
 
   // Everything on this page is informational. None of it reaches the balance
@@ -32,12 +33,24 @@ export default async function NotesPage() {
   const people = groupNotesByPerson(notes)
     .map((group) => {
       const about = group.notes[0].about!;
-      return { ...group, person: about, name: nicknames.get(about.id) ?? displayName(about) };
+      return {
+        ...group,
+        person: about,
+        name: nicknames.get(about.id) ?? displayName(about),
+        // A picture you uploaded for them wins over their own, as everywhere.
+        face: photos.get(about.id) ?? about.image,
+      };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const names = new Map(people.map((entry) => [entry.aboutUserId, entry.name]));
   const nameFor = (id: string) => names.get(id) ?? null;
+
+  const rows = notes.map((note) =>
+    note.about && photos.has(note.about.id)
+      ? { ...note, about: { ...note.about, image: photos.get(note.about.id)! } }
+      : note,
+  );
 
   return (
     <>
@@ -86,7 +99,7 @@ export default async function NotesPage() {
                   <Avatar
                     id={entry.person.id}
                     name={entry.name}
-                    image={entry.person.image}
+                    image={entry.face}
                     size={40}
                   />
                   <span className="min-w-0 flex-1">
@@ -120,7 +133,7 @@ export default async function NotesPage() {
             <h2 className="mb-2 px-1 text-xs font-bold tracking-wider muted uppercase">
               Everything, newest first
             </h2>
-            <NoteList notes={notes} nameFor={nameFor} />
+            <NoteList notes={rows} nameFor={nameFor} />
           </section>
         )}
       </div>

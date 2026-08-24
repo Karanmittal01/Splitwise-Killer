@@ -43,6 +43,8 @@ model User {
 
   accounts       Account[]
   profileImage   ProfileImage?
+  friendPhotos   FriendPhoto[]  @relation("FriendPhotoOwner")
+  photosOfThem   FriendPhoto[]  @relation("FriendPhotoSubject")
   sessions       Session[]
   memberships    GroupMember[]
   shares         ExpenseShare[]
@@ -251,6 +253,28 @@ model ProfileImage {
   updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// A picture you uploaded *for* somebody on your friends list.
+///
+/// Private to whoever uploaded it, exactly like a nickname: it is your own way
+/// of recognising them at a glance and never touches their account or what
+/// anybody else sees. Somebody who has never signed in can have one too, which
+/// is the main reason it exists — a placeholder has no picture of its own.
+model FriendPhoto {
+  id        String   @id @default(cuid())
+  ownerId   String
+  friendId  String
+  mimeType  String
+  size      Int
+  data      Bytes
+  updatedAt DateTime @updatedAt
+
+  owner  User @relation("FriendPhotoOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  friend User @relation("FriendPhotoSubject", fields: [friendId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, friendId])
+  @@index([ownerId])
 }
 
 model Receipt {

@@ -355,3 +355,71 @@ export async function addFriendContactAction(
   revalidatePath("/friends");
   return succeed(email ? "Email saved." : "Mobile number saved.");
 }
+
+const MAX_PHOTO_BYTES = 1.5 * 1024 * 1024;
+
+/**
+ * Upload a picture for somebody on your friends list.
+ *
+ * Private to you, exactly like the nickname beside it: it never touches their
+ * account and nobody else ever sees it. The point is recognising people at a
+ * glance — most of whom have never signed in and so have no picture of their
+ * own, which is why "DA" on a coloured circle is all there was before.
+ *
+ * The browser crops and shrinks to 256px before sending (see ImageCropper), so
+ * what arrives is tens of kilobytes; the limit below is the backstop.
+ */
+export async function updateFriendPhotoAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireUser();
+  const friendId = String(formData.get("friendId") ?? "");
+  const file = formData.get("photo");
+
+  const known = await prisma.friendship.findUnique({
+    where: { userId_friendId: { userId: user.id, friendId } },
+    select: { id: true },
+  });
+  if (!known) return fail("They're not on your friends list.");
+
+  if (!(file instanceof File) || file.size === 0) return fail("Choose a picture first.");
+  if (!file.type.startsWith("image/")) return fail("That file isn't an image.");
+  if (file.size > MAX_PHOTO_BYTES) return fail("That picture is too large. Try a smaller one.");
+
+  const data = Buffer.from(await file.arrayBuffer());
+  await prisma.friendPhoto.upsert({
+    where: { ownerId_friendId: { ownerId: user.id, friendId } },
+    create: { ownerId: user.id, friendId, mimeType: file.type, size: file.size, data },
+    update: { mimeType: file.type, size: file.size, data },
+  });
+
+  revalidateFriendViews(friendId);
+  return succeed("Picture saved. Only you can see it.");
+}
+
+/** Drop your picture of them, falling back to their own or to initials. */
+export async function removeFriendPhotoAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireUser();
+  const friendId = String(formData.get("friendId") ?? "");
+
+  const removed = await prisma.friendPhoto.deleteMany({
+    where: { ownerId: user.id, friendId },
+  });
+  if (removed.count === 0) return fail("There was no picture to remove.");
+
+  revalidateFriendViews(friendId);
+  return succeed("Picture removed.");
+}
+
+/** Their picture shows up in a lot of places; refresh all of them at once. */
+function revalidateFriendViews(friendId: string): void {
+  revalidatePath(`/friends/${friendId}`);
+  revalidatePath("/friends");
+  revalidatePath("/dashboard");
+  revalidatePath("/notes");
+  revalidatePath(`/notes/person/${friendId}`);
+}

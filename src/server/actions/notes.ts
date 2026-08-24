@@ -97,5 +97,11 @@ export async function deleteNoteAction(
 
   revalidatePath("/notes");
   if (note.aboutUserId) revalidatePath(`/notes/person/${note.aboutUserId}`);
+
+  // Deleting happens on the note's own page, which no longer exists once it is
+  // gone — so go back to wherever the caller came from.
+  const returnTo = String(formData.get("returnTo") ?? "");
+  if (returnTo.startsWith("/") && !returnTo.startsWith("//")) redirect(returnTo);
+
   return succeed("Note deleted.");
 }

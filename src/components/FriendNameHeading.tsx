@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Avatar } from "./Avatar";
+import { FriendPhotoUpload } from "./FriendPhotoUpload";
 import { setNicknameAction } from "@/server/actions/friends";
 import { idleState } from "@/server/actions/types";
 
@@ -21,6 +21,7 @@ export function FriendNameHeading({
   image,
   email,
   phone,
+  hasOwnPhoto,
 }: {
   friendId: string;
   /** What to show — the nickname if set, otherwise their real name. */
@@ -30,6 +31,8 @@ export function FriendNameHeading({
   image: string | null;
   email: string | null;
   phone: string | null;
+  /** True when the picture shown is one you uploaded, so it can be removed. */
+  hasOwnPhoto: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(nickname ?? "");
@@ -57,7 +60,12 @@ export function FriendNameHeading({
 
   return (
     <div className="flex min-w-0 items-center gap-3">
-      <Avatar id={friendId} name={name} image={image} size={52} />
+      <FriendPhotoUpload
+        friendId={friendId}
+        name={name}
+        image={image}
+        hasOwnPhoto={hasOwnPhoto}
+      />
 
       {editing ? (
         <div className="min-w-0">

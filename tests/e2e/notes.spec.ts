@@ -32,6 +32,18 @@ async function addFriend(page: Page, email: string) {
   await expect(page.getByText(/was added/)).toBeVisible();
 }
 
+/**
+ * Open somebody from the People list.
+ *
+ * Scoped to that section on purpose: note rows are links now too, and several
+ * of them carry the same person's name.
+ */
+async function openPerson(page: Page, name: string) {
+  const people = page.locator("section", { has: page.getByText(/^People \(/) });
+  await people.getByRole("link", { name: new RegExp(name) }).click();
+  await page.waitForURL(/\/notes\/person\//);
+}
+
 async function addNote(
   page: Page,
   note: { description: string; amount: string; direction: string; about?: string },
@@ -84,8 +96,7 @@ test("opening a person shows only their notes and their own net", async ({ page 
   await signIn(page);
 
   await page.goto("/notes");
-  await page.getByRole("link", { name: new RegExp(dadName) }).click();
-  await page.waitForURL(/\/notes\/person\//);
+  await openPerson(page, dadName);
 
   await expect(page.getByText("Net between you")).toBeVisible();
   await expect(page.getByText("₹4,54,588.00")).toBeVisible();
@@ -109,8 +120,7 @@ test("a second person gets their own section, kept apart from the first", async 
   await expect(page.getByText("People (2)")).toBeVisible();
 
   // Mum's page carries her ₹3,000 and none of Dad's.
-  await page.getByRole("link", { name: new RegExp(mumName) }).click();
-  await page.waitForURL(/\/notes\/person\//);
+  await openPerson(page, mumName);
 
   await expect(page.getByText("₹3,000.00").first()).toBeVisible();
   await expect(page.getByText("Lent for XEV 9S")).toHaveCount(0);
@@ -121,8 +131,7 @@ test("adding from a person's page comes back to it, already filled in", async ({
   await signIn(page);
 
   await page.goto("/notes");
-  await page.getByRole("link", { name: new RegExp(mumName) }).click();
-  await page.waitForURL(/\/notes\/person\//);
+  await openPerson(page, mumName);
   const personUrl = page.url();
 
   await page.getByRole("link", { name: "+ Add a note" }).click();
@@ -150,8 +159,7 @@ test("receiving more than you gave reads the other way round", async ({ page }) 
   await page.waitForURL(/\/notes/);
 
   await page.goto("/notes");
-  await page.getByRole("link", { name: new RegExp(mumName) }).click();
-  await page.waitForURL(/\/notes\/person\//);
+  await openPerson(page, mumName);
 
   // Gave ₹4,000, received ₹9,000 → ₹5,000 the other way.
   await expect(page.getByText("₹5,000.00").first()).toBeVisible();
@@ -172,4 +180,54 @@ test("none of it reaches a real balance", async ({ page }) => {
   await page.waitForURL(/\/friends\/[^/]+$/);
   await expect(page.getByText("₹4,54,588.00")).toHaveCount(0);
   await expect(page.getByText("Lent for XEV 9S")).toHaveCount(0);
+});
+
+test("a note opens its own page, and deleting lives there", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/notes");
+
+  // No delete button anywhere in the list — that is what kept getting hit by
+  // accident while scrolling.
+  await expect(page.getByRole("button", { name: "Delete" })).toHaveCount(0);
+
+  await page.getByRole("link", { name: /Groceries money/ }).click();
+  await page.waitForURL(/\/notes\/[^/]+$/);
+
+  // The whole note, in full.
+  await expect(page.getByRole("heading", { name: "Groceries money" })).toBeVisible();
+  await expect(page.getByText("₹3,000.00")).toBeVisible();
+  await expect(page.getByText("You gave")).toBeVisible();
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Delete note" }).click();
+
+  // Back to the person it belonged to, with the note gone and the net redone:
+  // ₹4,000 given became ₹1,000 against ₹9,000 received.
+  await page.waitForURL(/\/notes\/person\//);
+  await expect(page.getByText("Groceries money")).toHaveCount(0);
+  await expect(page.getByText("₹8,000.00").first()).toBeVisible();
+  await expect(page.getByText("you received more")).toBeVisible();
+});
+
+test("somebody else's note is not reachable by guessing its address", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/notes");
+
+  await page.getByRole("link", { name: /Diwali gift/ }).click();
+  await page.waitForURL(/\/notes\/[^/]+$/);
+  const noteUrl = page.url();
+
+  // A different account opening the same address gets nothing.
+  await page.context().clearCookies();
+  await page.goto("/login");
+  await page.getByLabel("Local testing email").fill(`nosy.${stamp}@example.com`);
+  await page.getByRole("button", { name: "Dev sign in" }).click();
+  await page.waitForURL("**/dashboard");
+
+  // Assert on what they actually see rather than the status code: the dev
+  // server answers the not-found boundary with 200, but the page is the
+  // "couldn't find that" one either way.
+  await page.goto(noteUrl);
+  await expect(page.getByRole("heading", { name: /couldn't find that/i })).toBeVisible();
+  await expect(page.getByText("Diwali gift")).toHaveCount(0);
 });
