@@ -203,12 +203,13 @@ test("signing up as an already-invited friend does not hand over their balances"
   await page.getByRole("button", { name: "Dev sign in" }).click();
   await page.waitForURL("**/dashboard");
 
-  await page.goto("/friends");
+  await page.goto("/friends/new");
   await page.getByLabel("Email or mobile number").fill(invited);
   await page.getByRole("button", { name: "Add friend" }).click();
   await expect(page.getByText(/was added/)).toBeVisible();
 
-  const friendRow = page.locator("a[href^='/friends/']").filter({ hasText: invited });
+  await page.goto("/friends");
+  const friendRow = page.locator("a[href^='/friends/']:not([href$='/new'])").filter({ hasText: invited });
   await friendRow.click();
   await page.waitForURL(/\/friends\/[^/]+$/);
   await page.getByRole("link", { name: "+ Add expense" }).click();
@@ -244,12 +245,13 @@ test("confirming the emailed link claims the balances that were waiting", async 
   await page.getByRole("button", { name: "Dev sign in" }).click();
   await page.waitForURL("**/dashboard");
 
-  await page.goto("/friends");
+  await page.goto("/friends/new");
   await page.getByLabel("Email or mobile number").fill(invited);
   await page.getByRole("button", { name: "Add friend" }).click();
   await expect(page.getByText(/was added/)).toBeVisible();
 
-  const friendRow = page.locator("a[href^='/friends/']").filter({ hasText: invited });
+  await page.goto("/friends");
+  const friendRow = page.locator("a[href^='/friends/']:not([href$='/new'])").filter({ hasText: invited });
   await friendRow.click();
   await page.waitForURL(/\/friends\/[^/]+$/);
   await page.getByRole("link", { name: "+ Add expense" }).click();

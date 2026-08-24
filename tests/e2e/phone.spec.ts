@@ -18,7 +18,7 @@ test.describe.configure({ mode: "serial" });
 test("the same number typed differently is one person", async ({ page }) => {
   await signIn(page, owner);
 
-  await page.goto("/friends");
+  await page.goto("/friends/new");
   await page.getByLabel("Nickname (optional)").fill("Phone Person");
   await page.getByLabel("Email or mobile number").fill(local);
   await page.getByRole("button", { name: "Add friend" }).click();
@@ -31,13 +31,13 @@ test("the same number typed differently is one person", async ({ page }) => {
   await expect(page.getByText(/is now on your friends list|was added/)).toBeVisible();
 
   await page.goto("/friends");
-  await expect(page.locator("a[href^='/friends/']")).toHaveCount(1);
+  await expect(page.locator("a[href^='/friends/']:not([href$='/new'])")).toHaveCount(1);
 });
 
 test("a mobile invite offers WhatsApp and SMS", async ({ page }) => {
   await signIn(page, owner);
   await page.goto("/friends");
-  await page.locator("a[href^='/friends/']").first().click();
+  await page.locator("a[href^='/friends/']:not([href$='/new'])").first().click();
   await page.waitForURL(/\/friends\//);
 
   const whatsapp = page.getByLabel(`WhatsApp +91${local}`);

@@ -35,7 +35,7 @@ test("merging two placeholder friends sums their balances into one", async ({ pa
 
   // Two separate placeholder friends who are really the same person: one added
   // by phone, one by email.
-  await page.goto("/friends");
+  await page.goto("/friends/new");
   await page.getByLabel("Email or mobile number").fill(dupPhone);
   await page.getByRole("button", { name: "Add friend" }).click();
   await expect(page.getByText(/was added/)).toBeVisible();
@@ -45,16 +45,17 @@ test("merging two placeholder friends sums their balances into one", async ({ pa
   await expect(page.getByText(/was added/)).toBeVisible();
 
   // Two distinct friends on the list.
-  await expect(page.locator("a[href^='/friends/']")).toHaveCount(2);
+  await page.goto("/friends");
+  await expect(page.locator("a[href^='/friends/']:not([href$='/new'])")).toHaveCount(2);
 
   // A ₹1,000 bill split with the phone one → they owe ₹500.
-  const byPhone = page.locator("a[href^='/friends/']").filter({ hasText: dupPhone });
+  const byPhone = page.locator("a[href^='/friends/']:not([href$='/new'])").filter({ hasText: dupPhone });
   const phonePath = (await byPhone.getAttribute("href")) ?? "";
   await addExpenseWith(page, phonePath, "Lunch", "1000");
 
   // A ₹600 bill split with the email one → they owe ₹300.
   await page.goto("/friends");
-  const byEmail = page.locator("a[href^='/friends/']").filter({ hasText: dupEmail });
+  const byEmail = page.locator("a[href^='/friends/']:not([href$='/new'])").filter({ hasText: dupEmail });
   const emailPath = (await byEmail.getAttribute("href")) ?? "";
   await addExpenseWith(page, emailPath, "Cab", "600");
 
@@ -76,20 +77,21 @@ test("merging two placeholder friends sums their balances into one", async ({ pa
 
   // And the friends list has collapsed to a single person.
   await page.goto("/friends");
-  await expect(page.locator("a[href^='/friends/']")).toHaveCount(1);
+  await expect(page.locator("a[href^='/friends/']:not([href$='/new'])")).toHaveCount(1);
   await expect(page.getByText("₹800.00").first()).toBeVisible();
 });
 
 test("adding a brand-new detail just records it, no merge", async ({ page }) => {
   await signIn(page);
-  await page.goto("/friends");
+  await page.goto("/friends/new");
 
   const onlyPhone = `+9196${String(stamp).slice(-8)}`;
   await page.getByLabel("Email or mobile number").fill(onlyPhone);
   await page.getByRole("button", { name: "Add friend" }).click();
   await expect(page.getByText(/was added/)).toBeVisible();
 
-  const row = page.locator("a[href^='/friends/']").filter({ hasText: onlyPhone });
+  await page.goto("/friends");
+  const row = page.locator("a[href^='/friends/']:not([href$='/new'])").filter({ hasText: onlyPhone });
   await row.click();
   await page.waitForURL(/\/friends\/[^/]+$/);
 

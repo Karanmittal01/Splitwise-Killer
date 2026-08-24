@@ -59,6 +59,7 @@ export async function addFriendAction(
     });
 
     revalidatePath("/friends");
+    revalidatePath("/friends/new");
     return succeed(
       !invited
         ? `${person.name ?? handle} is now on your friends list.`

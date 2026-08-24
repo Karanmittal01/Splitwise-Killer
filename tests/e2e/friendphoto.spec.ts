@@ -30,7 +30,7 @@ async function signIn(page: Page, email: string) {
 
 async function openDad(page: Page) {
   await page.goto("/friends");
-  await page.locator("a[href^='/friends/']").filter({ hasText: dad }).click();
+  await page.locator("a[href^='/friends/']:not([href$='/new'])").filter({ hasText: dad }).click();
   await page.waitForURL(/\/friends\/[^/]+$/);
 }
 
@@ -48,7 +48,7 @@ async function uploadPhoto(page: Page) {
 test("a friend with no picture of their own can be given one", async ({ page }) => {
   await signIn(page, me);
 
-  await page.goto("/friends");
+  await page.goto("/friends/new");
   await page.getByLabel("Email or mobile number").fill(dad);
   await page.getByRole("button", { name: "Add friend" }).click();
   await expect(page.getByText(/was added/)).toBeVisible();

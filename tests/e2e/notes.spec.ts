@@ -26,7 +26,7 @@ async function signIn(page: Page) {
 }
 
 async function addFriend(page: Page, email: string) {
-  await page.goto("/friends");
+  await page.goto("/friends/new");
   await page.getByLabel("Email or mobile number").fill(email);
   await page.getByRole("button", { name: "Add friend" }).click();
   await expect(page.getByText(/was added/)).toBeVisible();
@@ -176,7 +176,7 @@ test("none of it reaches a real balance", async ({ page }) => {
 
   // The friend's real page is untouched too — no note appears as a debt.
   await page.goto("/friends");
-  await page.locator("a[href^='/friends/']").filter({ hasText: dad }).click();
+  await page.locator("a[href^='/friends/']:not([href$='/new'])").filter({ hasText: dad }).click();
   await page.waitForURL(/\/friends\/[^/]+$/);
   await expect(page.getByText("₹4,54,588.00")).toHaveCount(0);
   await expect(page.getByText("Lent for XEV 9S")).toHaveCount(0);

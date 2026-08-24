@@ -18,7 +18,7 @@ test.describe.configure({ mode: "serial" });
 
 test("add a friend, then give them a private nickname", async ({ page }) => {
   await signIn(page);
-  await page.goto("/friends");
+  await page.goto("/friends/new");
 
   // The field is called Nickname now, not "Their name".
   await expect(page.getByLabel("Nickname (optional)")).toBeVisible();
@@ -26,7 +26,8 @@ test("add a friend, then give them a private nickname", async ({ page }) => {
   await page.getByRole("button", { name: "Add friend" }).click();
   await expect(page.getByText(/was added/)).toBeVisible();
 
-  await page.locator("a[href^='/friends/']").first().click();
+  await page.goto("/friends");
+  await page.locator("a[href^='/friends/']:not([href$='/new'])").first().click();
   await page.waitForURL(/\/friends\//);
 
   // Rename inline via the pencil beside the name.
@@ -140,7 +141,7 @@ test("a friend's transactions can be picked and shared", async ({ page }) => {
 
 test("the invite row is icons only", async ({ page }) => {
   await signIn(page);
-  await page.goto("/friends");
+  await page.goto("/friends/new");
 
   // Somebody who has not signed in yet — once they do, there is no invite to
   // send and the row correctly disappears.
@@ -150,6 +151,7 @@ test("the invite row is icons only", async ({ page }) => {
   await page.getByRole("button", { name: "Add friend" }).click();
   await expect(page.getByText(/was added/)).toBeVisible();
 
+  await page.goto("/friends");
   await page.getByText("Pending Pal").first().click();
   await page.waitForURL(/\/friends\/[^/]+$/);
 
@@ -164,7 +166,7 @@ test("the invite row is icons only", async ({ page }) => {
 
 test("contacts can be imported from a vCard file", async ({ page }) => {
   await signIn(page);
-  await page.goto("/friends");
+  await page.goto("/friends/new");
 
   const vcf = [
     "BEGIN:VCARD",
@@ -184,7 +186,8 @@ test("contacts can be imported from a vCard file", async ({ page }) => {
   await page.getByRole("button", { name: /Add 1 person/ }).click();
   await expect(page.getByText(/1 added/)).toBeVisible();
 
-  await page.reload();
+  // And they are on the list itself, not just in the import panel.
+  await page.goto("/friends");
   await expect(page.getByText("Imported Person")).toBeVisible();
 });
 

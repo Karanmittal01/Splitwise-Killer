@@ -26,12 +26,13 @@ let inviteUrl = "";
 test("add a friend by mobile number and split with them", async ({ page }) => {
   await signIn(page, owner);
 
-  await page.goto("/friends");
+  await page.goto("/friends/new");
   await page.getByLabel("Nickname (optional)").fill("Phone Friend");
   await page.getByLabel("Email or mobile number").fill(phoneFriend);
   await page.getByRole("button", { name: "Add friend" }).click();
   await expect(page.getByText(/was added|is now on your friends list/)).toBeVisible();
 
+  await page.goto("/friends");
   await page.getByText("Phone Friend").first().click();
   await page.waitForURL(/\/friends\//);
 
@@ -73,7 +74,7 @@ test("the inviter still sees exactly one person, now a real account", async ({ p
   await signIn(page, owner);
   await page.goto("/friends");
 
-  const rows = page.locator("a[href^='/friends/']");
+  const rows = page.locator("a[href^='/friends/']:not([href$='/new'])");
   await expect(rows).toHaveCount(1);
   await expect(page.getByText("₹400.00").first()).toBeVisible();
   await expect(page.getByText("invited")).toHaveCount(0);
@@ -82,7 +83,7 @@ test("the inviter still sees exactly one person, now a real account", async ({ p
 test("an expense can have more than one payer", async ({ page }) => {
   await signIn(page, owner);
   await page.goto("/friends");
-  await page.locator("a[href^='/friends/']").first().click();
+  await page.locator("a[href^='/friends/']:not([href$='/new'])").first().click();
   await page.getByRole("link", { name: "+ Add expense" }).click();
 
   await page.getByLabel("Description").fill("Weekend groceries");
