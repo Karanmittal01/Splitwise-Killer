@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { appUrl, inviteLink } from "./people";
+import { appUrl, inviteLink, verifyLink } from "./people";
 
 /**
  * Optional email delivery.
@@ -77,6 +77,38 @@ export async function sendInviteEmail(params: {
         <a href="${link}" style="background:#12b886;color:#fff;text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600;display:inline-block">Sign in and see your balance</a>
       </p>
       <p style="color:#8a9a94;font-size:13px">Or paste this link into your browser:<br>${link}</p>`),
+  );
+}
+
+/**
+ * Confirm that somebody signing up with a password really owns the address.
+ *
+ * Only sent when the address already has expenses waiting on it — see
+ * signUpAction. Somebody else's balances are on the other side of this link, so
+ * it is the one thing standing between typing a friend's email and reading
+ * their ledger.
+ */
+export async function sendVerificationEmail(params: {
+  to: string;
+  token: string;
+}): Promise<boolean> {
+  if (!emailConfigured) return false;
+
+  const link = verifyLink(params.token);
+
+  return send(
+    params.to,
+    "Confirm your email for Splitwise Killer",
+    shell(`<p style="font-size:15px;color:#26332e;line-height:1.6">
+        Somebody has already been splitting bills with this email address, so
+        there are balances waiting for you. Confirm the address is yours and
+        they're all yours.
+      </p>
+      <p style="margin:24px 0">
+        <a href="${link}" style="background:#12b886;color:#fff;text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600;display:inline-block">Confirm my email</a>
+      </p>
+      <p style="color:#8a9a94;font-size:13px">Or paste this link into your browser:<br>${link}</p>
+      <p style="color:#8a9a94;font-size:13px">The link works for 24 hours. If you didn't try to sign up, ignore this email — nothing changes until it's opened.</p>`),
   );
 }
 

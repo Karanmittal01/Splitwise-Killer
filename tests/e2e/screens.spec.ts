@@ -10,8 +10,8 @@ const OUT = process.env.SHOT_DIR ?? "screenshots";
 
 async function signIn(page: Page) {
   await page.goto("/login");
-  await page.getByPlaceholder("you@example.com").fill("demo.alex@example.com");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByLabel("Local testing email").fill("demo.alex@example.com");
+  await page.getByRole("button", { name: "Dev sign in" }).click();
   await page.waitForURL("**/dashboard");
 }
 

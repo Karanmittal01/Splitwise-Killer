@@ -9,8 +9,8 @@ const WIDE = Buffer.from(
 async function signIn(page: Page) {
   await page.context().clearCookies();
   await page.goto("/login");
-  await page.getByPlaceholder("you@example.com").fill("demo.riya@example.com");
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByLabel("Local testing email").fill("demo.riya@example.com");
+  await page.getByRole("button", { name: "Dev sign in" }).click();
   await page.waitForURL("**/dashboard");
 }
 

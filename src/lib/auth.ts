@@ -87,6 +87,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           emailVerified: new Date(),
           name: claiming ? googleName : (existing?.name ?? googleName),
           image: claiming ? googlePicture : (existing?.image ?? googlePicture),
+          // A placeholder may be carrying a password from a sign-up that was
+          // never confirmed by email — possibly somebody else's hopeful guess
+          // at this address. Walking in through Google settles who owns the
+          // account, so that unconfirmed password is thrown away. A password
+          // the owner set themselves is on a non-placeholder account and is
+          // left well alone.
+          ...(claiming ? { passwordHash: null } : {}),
         },
       });
     },

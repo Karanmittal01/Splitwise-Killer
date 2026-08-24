@@ -2,6 +2,7 @@ import { PageHeader } from "@/components/AppShell";
 import { ActionForm } from "@/components/ActionForm";
 import { ProfileCard } from "@/components/ProfileCard";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { PasswordSettings } from "@/components/PasswordSettings";
 import { SubmitButton } from "@/components/form";
 import { CURRENCIES } from "@/lib/currencies";
 import { signOut } from "@/lib/auth";
@@ -16,11 +17,18 @@ export default async function AccountPage() {
   const user = await requireUser();
 
   const theme = await getTheme();
-  const [groupCount, expenseCount, friendCount] = await Promise.all([
+  const [groupCount, expenseCount, friendCount, credentials] = await Promise.all([
     prisma.groupMember.count({ where: { userId: user.id } }),
     prisma.expenseShare.count({ where: { userId: user.id, expense: { deletedAt: null } } }),
     prisma.friendship.count({ where: { userId: user.id } }),
+    prisma.user.findUnique({
+      where: { id: user.id },
+      select: { passwordHash: true, accounts: { select: { provider: true } } },
+    }),
   ]);
+
+  const hasPassword = Boolean(credentials?.passwordHash);
+  const hasGoogle = (credentials?.accounts ?? []).some((a) => a.provider === "google");
 
   return (
     <>
@@ -105,8 +113,16 @@ export default async function AccountPage() {
           <ThemeToggle current={theme} />
         </section>
 
+        <PasswordSettings hasPassword={hasPassword} />
+
         <section className="card p-4">
-          <h2 className="mb-1 font-semibold">Signed in with Google</h2>
+          <h2 className="mb-1 font-semibold">
+            {hasGoogle && hasPassword
+              ? "Google and password"
+              : hasGoogle
+                ? "Signed in with Google"
+                : "Signed in with your email"}
+          </h2>
           <p className="mb-3 text-sm muted">
             Your email address is how friends add you, so expenses find you automatically.
           </p>

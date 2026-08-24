@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { normaliseEmail } from "@/lib/people";
+import { startSession } from "@/lib/auth-session";
 
 /**
  * Local-only sign-in so the app can be run and tested before Google OAuth
@@ -35,17 +34,7 @@ export async function POST(request: Request) {
         data: { email, name, isPlaceholder: false, emailVerified: new Date() },
       });
 
-  const sessionToken = randomUUID();
-  const expires = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30);
-  await prisma.session.create({ data: { sessionToken, userId: user.id, expires } });
-
-  const jar = await cookies();
-  jar.set("authjs.session-token", sessionToken, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    expires,
-  });
+  await startSession(user.id);
 
   return NextResponse.redirect(new URL("/dashboard", request.url), { status: 303 });
 }

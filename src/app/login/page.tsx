@@ -4,6 +4,7 @@ import { googleConfigured, signIn } from "@/lib/auth";
 import { getCurrentUser } from "@/lib/session";
 import { SubmitButton } from "@/components/form";
 import { BrandMark } from "@/components/BrandMark";
+import { PasswordAuthForm } from "@/components/PasswordAuthForm";
 
 export const metadata = { title: "Sign in" };
 
@@ -43,6 +44,10 @@ export default async function LoginPage({
             Sign in to see what you owe, what you&apos;re owed, and everything in between.
           </p>
 
+          {/* Google first — it's one tap and it needs no new password to
+              remember — but email and password is right underneath for anyone
+              who would rather not involve Google at all. */}
+
           {error && (
             <p className="mt-4 rounded-xl bg-[var(--color-coral-50)] px-3 py-2 text-sm text-[var(--color-coral-700)] dark:bg-[#3a1d15] dark:text-[var(--color-coral-300)]">
               {error}
@@ -75,19 +80,36 @@ export default async function LoginPage({
             </div>
           )}
 
+          {googleConfigured && (
+            <div className="my-6 flex items-center gap-3">
+              <span className="h-px flex-1 bg-[var(--surface-border)]" />
+              <span className="text-xs font-semibold tracking-wider muted uppercase">or</span>
+              <span className="h-px flex-1 bg-[var(--surface-border)]" />
+            </div>
+          )}
+
+          <div className={googleConfigured ? "" : "mt-6"}>
+            <PasswordAuthForm next={next} />
+          </div>
+
           {devLogin && (
             <form action="/api/dev-login" method="post" className="mt-6 border-t border-[var(--surface-border)] pt-6">
               <p className="label">Local testing sign-in (development only)</p>
               <div className="flex flex-col gap-2 sm:flex-row">
+                {/* Deliberately not labelled "Email" or placeheld with
+                    you@example.com: the real sign-in form above owns those, and
+                    two identical-looking fields on one page is how a test ends
+                    up quietly driving the wrong one. */}
                 <input
                   className="field"
                   type="email"
                   name="email"
-                  placeholder="you@example.com"
+                  aria-label="Local testing email"
+                  placeholder="tester@example.com"
                   required
                 />
                 <button type="submit" className="btn btn-secondary">
-                  Sign in
+                  Dev sign in
                 </button>
               </div>
               <p className="mt-2 text-xs muted">

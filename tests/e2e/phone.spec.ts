@@ -8,8 +8,8 @@ const local = `98${String(stamp).slice(-8)}`; // a 10-digit local number
 async function signIn(page: Page, email: string) {
   await page.context().clearCookies();
   await page.goto("/login");
-  await page.getByPlaceholder("you@example.com").fill(email);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByLabel("Local testing email").fill(email);
+  await page.getByRole("button", { name: "Dev sign in" }).click();
   await page.waitForURL("**/dashboard");
 }
 

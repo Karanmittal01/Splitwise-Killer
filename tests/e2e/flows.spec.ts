@@ -12,8 +12,8 @@ const riya = `riya.${stamp}@example.com`;
 
 async function signIn(page: Page, email: string) {
   await page.goto("/login");
-  await page.getByPlaceholder("you@example.com").fill(email);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByLabel("Local testing email").fill(email);
+  await page.getByRole("button", { name: "Dev sign in" }).click();
   await page.waitForURL("**/dashboard");
 }
 

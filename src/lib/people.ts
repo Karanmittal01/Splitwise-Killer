@@ -130,6 +130,10 @@ export function inviteLink(token: string): string {
   return `${appUrl()}/join/${token}`;
 }
 
+export function verifyLink(token: string): string {
+  return `${appUrl()}/verify/${token}`;
+}
+
 /**
  * Fold `sourceId` into `targetId`. Used when somebody redeems an invite for a
  * placeholder that isn't matched by their email. Everything the placeholder

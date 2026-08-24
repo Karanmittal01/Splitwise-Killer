@@ -1,12 +1,12 @@
 # Splitwise Killer
 
-A self-hosted Splitwise alternative. Sign in with Google, split bills with people
-who don't have an account yet, and settle up — everything rendered and computed
+A self-hosted Splitwise alternative. Sign in with Google or an email and
+password, split bills with people who don't have an account yet, and settle up — everything rendered and computed
 on the server, everything free to run.
 
 ```
 Next.js 16 (App Router, Server Components + Server Actions)
-Auth.js v5 with Google sign-in
+Auth.js v5 — Google, plus email and password
 Postgres via Prisma 7
 Tailwind CSS v4
 ```
@@ -31,6 +31,9 @@ Tailwind CSS v4
 **People**
 
 - **Google sign-in** — nothing to remember, nothing to reset
+- **Or an email and a password**, for anyone who would rather not involve
+  Google. Joined with Google and want a password too? *Account → Password*
+  adds one; either way in then works
 - **Invite by email or mobile number.** People you add exist immediately as
   placeholder accounts holding real balances. When they sign in with Google
   using that email, the account is theirs. Invited by phone, or signed up with
@@ -124,6 +127,31 @@ That's the whole setup, and it costs nothing.
 > somebody who was invited by email walk straight into the balances waiting for
 > them. It is safe here because Google only ever hands us verified addresses,
 > and Google is the only provider configured.
+
+---
+
+## Passwords
+
+Passwords are hashed with **scrypt** from Node's own `crypto` — no native
+module to build, nothing to install, and the cost parameters are stored
+alongside each hash so they can be raised later without locking anybody out.
+The plain password is never written down or logged.
+
+Auth.js can't do password sign-in on the database session strategy, so
+`src/lib/auth-session.ts` mints the session itself: the same `Session` row and
+the same cookie Auth.js would have written. Everything downstream — `auth()`,
+`signOut()`, session expiry — is unchanged.
+
+**One rule is worth knowing.** An email address that has already been invited
+here owns real balances before anybody has ever signed into it. If signing up
+with a password could claim those on the spot, knowing a friend's email address
+would be enough to read their expenses. So that one case is held behind a
+confirmation email (`RESEND_API_KEY`); the address is only handed over once the
+link in it is opened. Signing up with an address nobody has mentioned has
+nothing to hand over, so it goes straight through.
+
+If email isn't configured, that sign-up is refused rather than waved through —
+the invite link or Google sign-in are the ways in.
 
 ---
 

@@ -27,6 +27,10 @@ model User {
   // App profile
   phone           String?  @unique
   defaultCurrency String   @default("INR")
+  // Set when the account can be signed into with an email and password. Null
+  // means Google is the only way in. Format is scrypt$N$r$p$salt$key — see
+  // src/lib/password.ts; the plain password never reaches the database.
+  passwordHash    String?
   // A placeholder is somebody who was added to a group/expense by email or
   // phone but has never signed in. They own real balances; when they sign in
   // with a matching Google account (or redeem an invite link) the placeholder
