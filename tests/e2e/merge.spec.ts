@@ -70,6 +70,10 @@ test("merging two placeholder friends sums their balances into one", async ({ pa
   await expect(page.getByText("Lunch").first()).toBeVisible();
   await expect(page.getByText("₹800.00").first()).toBeVisible();
 
+  // Both contact details survive the merge and show together in the header.
+  await expect(page.getByText(dupEmail).first()).toBeVisible();
+  await expect(page.getByText(dupPhone).first()).toBeVisible();
+
   // And the friends list has collapsed to a single person.
   await page.goto("/friends");
   await expect(page.locator("a[href^='/friends/']")).toHaveCount(1);

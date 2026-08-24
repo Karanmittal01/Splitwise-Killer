@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { EmptyState, PageHeader } from "@/components/AppShell";
+import { EmptyState } from "@/components/AppShell";
 import { ActionForm } from "@/components/ActionForm";
 import { AddFriendContact } from "@/components/AddFriendContact";
 import { ExpenseList } from "@/components/ExpenseList";
@@ -84,24 +84,25 @@ export default async function FriendPage({ params }: { params: Promise<{ id: str
 
   return (
     <>
-      <PageHeader
-        back={{ href: "/friends", label: "Friends" }}
-        title={
+      {/* Custom header: back link, then the identity block and the actions on
+          one row so the name and contact sit beside the avatar, not under it. */}
+      <div className="mb-5">
+        <Link
+          href="/friends"
+          className="mb-3 inline-flex items-center gap-1 text-sm muted hover:underline"
+        >
+          ← Friends
+        </Link>
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <FriendNameHeading
             friendId={person.id}
             name={name}
             realName={realName}
             nickname={nickname}
             image={person.image}
+            email={person.email}
+            phone={person.phone}
           />
-        }
-        subtitle={
-          <span className="flex flex-wrap items-center gap-x-2">
-            {nickname && <span>{realName} ·</span>}
-            {person.email ?? person.phone ?? "no contact details"}
-          </span>
-        }
-        action={
           <div className="flex flex-wrap gap-2">
             <Link href={`/friends/${person.id}/settle`} className="btn btn-secondary">
               Settle up
@@ -110,8 +111,8 @@ export default async function FriendPage({ params }: { params: Promise<{ id: str
               + Add expense
             </Link>
           </div>
-        }
-      />
+        </div>
+      </div>
 
       {/* Balance and the share-list action share one compact row. */}
       <div className="card animate-rise mb-5 flex flex-wrap items-center justify-between gap-3 px-4 py-3">

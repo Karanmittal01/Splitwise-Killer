@@ -6,12 +6,12 @@ import { setNicknameAction } from "@/server/actions/friends";
 import { idleState } from "@/server/actions/types";
 
 /**
- * The friend's name in the page header, with a small pencil to rename them.
+ * The friend's identity block: avatar on the left, name and contact details
+ * stacked beside it, with a pencil to rename.
  *
  * "Name" here is your private label for this person (a nickname). It lives on
  * the friendship, never on their account, so whatever they later set as their
- * own Google name never overwrites the name you chose. Editing happens inline
- * — the name becomes an input in place, no separate section.
+ * own Google name never overwrites the name you chose. Editing happens inline.
  */
 export function FriendNameHeading({
   friendId,
@@ -19,6 +19,8 @@ export function FriendNameHeading({
   realName,
   nickname,
   image,
+  email,
+  phone,
 }: {
   friendId: string;
   /** What to show — the nickname if set, otherwise their real name. */
@@ -26,11 +28,17 @@ export function FriendNameHeading({
   realName: string;
   nickname: string | null;
   image: string | null;
+  email: string | null;
+  phone: string | null;
 }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(nickname ?? "");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // Real name (when a nickname is set) then every way to reach them, so both
+  // an email and a phone show together rather than one hiding the other.
+  const details = [nickname ? realName : null, email, phone].filter(Boolean) as string[];
 
   function save() {
     setError(null);
@@ -47,63 +55,74 @@ export function FriendNameHeading({
     });
   }
 
-  if (editing) {
-    return (
-      <span className="flex flex-col gap-1">
-        <span className="flex items-center gap-2.5">
-          <Avatar id={friendId} name={name} image={image} size={44} />
-          <input
-            autoFocus
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") save();
-              if (e.key === "Escape") setEditing(false);
-            }}
-            placeholder={realName}
-            maxLength={60}
-            className="field max-w-56 text-xl font-bold"
-            aria-label="Name for this friend"
-          />
-          <button
-            type="button"
-            onClick={save}
-            disabled={pending}
-            className="btn btn-primary px-3 py-1.5 text-sm"
-          >
-            {pending ? "…" : "Save"}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setValue(nickname ?? "");
-              setEditing(false);
-            }}
-            className="btn btn-ghost px-2 py-1.5 text-sm"
-          >
-            Cancel
-          </button>
-        </span>
-        <span className="pl-[3.375rem] text-xs muted">
-          {error ?? `Only you see this. Leave it empty to use ${realName}.`}
-        </span>
-      </span>
-    );
-  }
-
   return (
-    <span className="flex items-center gap-2.5">
-      <Avatar id={friendId} name={name} image={image} size={44} />
-      <span className="min-w-0 truncate">{name}</span>
-      <button
-        type="button"
-        onClick={() => setEditing(true)}
-        title="Edit name"
-        aria-label="Edit name"
-        className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-sm muted transition-colors hover:bg-[var(--surface-raised)] hover:text-[var(--text-strong)]"
-      >
-        ✎
-      </button>
-    </span>
+    <div className="flex min-w-0 items-center gap-3">
+      <Avatar id={friendId} name={name} image={image} size={52} />
+
+      {editing ? (
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              autoFocus
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") save();
+                if (e.key === "Escape") setEditing(false);
+              }}
+              placeholder={realName}
+              maxLength={60}
+              className="field max-w-52 text-xl font-bold"
+              aria-label="Name for this friend"
+            />
+            <button
+              type="button"
+              onClick={save}
+              disabled={pending}
+              className="btn btn-primary px-3 py-1.5 text-sm"
+            >
+              {pending ? "…" : "Save"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setValue(nickname ?? "");
+                setEditing(false);
+              }}
+              className="btn btn-ghost px-2 py-1.5 text-sm"
+            >
+              Cancel
+            </button>
+          </div>
+          <p className="mt-1 text-xs muted">
+            {error ?? `Only you see this. Leave it empty to use ${realName}.`}
+          </p>
+        </div>
+      ) : (
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <h1 className="truncate text-2xl font-bold tracking-tight">{name}</h1>
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              title="Edit name"
+              aria-label="Edit name"
+              className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-sm muted transition-colors hover:bg-[var(--surface-raised)] hover:text-[var(--text-strong)]"
+            >
+              ✎
+            </button>
+          </div>
+          {details.length > 0 && (
+            <div className="mt-0.5 space-y-0.5 text-sm muted">
+              {details.map((detail) => (
+                <p key={detail} className="truncate">
+                  {detail}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
