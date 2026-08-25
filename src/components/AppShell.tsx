@@ -4,6 +4,7 @@ import { NavLink, TabLink } from "./NavLink";
 import { MobileMenu } from "./MobileMenu";
 import type { CurrentUser } from "@/lib/session";
 import { displayName } from "@/lib/session";
+import { isOwner } from "@/lib/owner";
 import { BrandMark } from "./BrandMark";
 
 export type ShellGroup = { id: string; name: string; emoji: string };
@@ -19,6 +20,9 @@ export function AppShell({
   unread: number;
   children: React.ReactNode;
 }) {
+  // Tools are personal utilities, shown only to whoever owns the deployment.
+  const showTools = isOwner(user);
+
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-6xl">
       {/* Desktop sidebar */}
@@ -34,6 +38,7 @@ export function AppShell({
           <NavLink href="/friends" icon="🙋" label="Friends" />
           <NavLink href="/activity" icon="🔔" label="Activity" badge={unread} />
           <NavLink href="/notes" icon="🗒️" label="Personal notes" />
+          {showTools && <NavLink href="/tools" icon="🛠️" label="Tools" />}
           <NavLink href="/account" icon="⚙️" label="Account" />
           <NavLink href="/contact" icon="💬" label="Contact" />
         </nav>
@@ -85,6 +90,7 @@ export function AppShell({
             name={displayName(user)}
             email={user.email}
             image={user.image}
+            showTools={showTools}
           />
         </header>
 

@@ -200,6 +200,45 @@ Nothing in the code is tied to a hostname, so no code changes are needed.
 
 ---
 
+## Tools (optional)
+
+A **Tools** section in the sidebar, holding personal automations. It appears only
+for the signed-in account whose email matches `OWNER_EMAIL`, and every page and
+API route under it 404s for anybody else — so on a deployment somebody else runs,
+it does not exist.
+
+The one tool so far buys the monthly ₹1,000 Amazon Pay gift card on the Amex
+Shopwise portal. You tap *Buy* and send the two OTPs; everything else happens on
+its own.
+
+Driving a third-party checkout needs a real browser held open for minutes, which
+a serverless function cannot do — so the automation lives in a **separate worker
+process** ([AmEx-Shopwise](https://github.com/Karanmittal01/AmEx-Shopwise)) that
+polls this app for work:
+
+```
+/tools/shopwise  ──► ShopwiseJob row ◄── worker polls, drives the portal
+      ▲                                        │
+      └──────── OTP you type, relayed ─────────┘
+```
+
+The worker only ever calls out, so it can sit on a Raspberry Pi or a small VPS
+with no inbound access. **Card details never reach this app or its database** —
+they stay encrypted on the worker. `ShopwiseJob` holds only amounts, phases,
+order references, and an OTP that is deleted the instant the worker collects it.
+
+To enable it:
+
+```bash
+OWNER_EMAIL="you@example.com"                   # who sees Tools
+SHOPWISE_WORKER_TOKEN="$(openssl rand -hex 32)" # shared secret for the worker
+```
+
+Leave `SHOPWISE_WORKER_TOKEN` empty and every worker request is rejected, which
+switches the tool off without removing it.
+
+---
+
 ## Tests
 
 ```bash
