@@ -178,6 +178,16 @@ Set these environment variables:
 | `RESEND_API_KEY` / `RESEND_FROM` | optional, for invite emails |
 | `RESEND_API_URL` | optional; point mail delivery at a stub or your own relay |
 
+### App icons
+
+`public/icon-source.png` is the original artwork — a rounded square on a
+white card. Phones draw their own mask and shadow, so shipping it as-is puts
+a white plate around the icon on the home screen. `scripts/build-icons.py`
+crops past the artwork's own rounded corners and writes every size the app
+serves, including a separate maskable variant with the margin a launcher
+mask needs. Re-run it (`python3 scripts/build-icons.py`, needs Pillow) after
+replacing the source artwork.
+
 The build command (`prisma generate && prisma db push && next build`) creates
 the database tables for you on the first deploy, so there is nothing to run by
 hand.
