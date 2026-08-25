@@ -102,7 +102,13 @@ export async function removeFriendAction(
   });
 
   revalidatePath("/friends");
-  return succeed("Removed from your friends list.");
+  revalidatePath(`/friends/${friendId}`);
+  revalidatePath("/dashboard");
+
+  // You are standing on their page, and they are no longer a friend. Every
+  // other delete in the app leaves the page it just emptied; this one used to
+  // sit there looking unchanged until you reloaded by hand.
+  redirect("/friends");
 }
 
 export type QuickPerson = {

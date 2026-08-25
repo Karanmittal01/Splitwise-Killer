@@ -73,3 +73,51 @@ test("Done goes back to the list, with the new person on it", async ({ page }) =
   await expect(page.getByText("settled up").first()).toBeVisible();
   await expect(page.getByText("1 person, sorted by what's outstanding.")).toBeVisible();
 });
+
+test("removing a friend lands you back on the list, already updated", async ({ page }) => {
+  const gone = `gone.${stamp}@example.com`;
+
+  await signIn(page);
+  await page.goto("/friends/new");
+  await page.getByLabel("Nickname (optional)").fill("Temporary");
+  await page.getByLabel("Email or mobile number").fill(gone);
+  await page.getByRole("button", { name: "Add friend" }).click();
+  await expect(page.getByRole("status").first()).toContainText("Temporary");
+
+  await page.goto("/friends");
+  await page.getByRole("link", { name: /Temporary/ }).click();
+  await page.waitForURL(/\/friends\/[^/]+$/);
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Remove from friends" }).click();
+
+  // Back on the list by itself — no manual reload to find out it worked.
+  await page.waitForURL(/\/friends$/);
+  await expect(page.getByText("Temporary")).toHaveCount(0);
+  await expect(page.getByText("Riya", { exact: true })).toBeVisible();
+});
+
+test("you can't remove somebody you still share an expense with", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/friends");
+  await page.getByRole("link", { name: /Riya/ }).click();
+  await page.waitForURL(/\/friends\/[^/]+$/);
+  const riyaUrl = page.url();
+
+  await page.getByRole("link", { name: "+ Add expense" }).click();
+  await page.getByLabel("Description").fill("Shared taxi");
+  await page.getByLabel("Amount").fill("500");
+  await page.getByRole("button", { name: "Save expense" }).click();
+  await page.waitForURL(
+    (url) => /^\/expenses\/[^/]+$/.test(url.pathname) && !url.pathname.endsWith("/new"),
+  );
+
+  await page.goto(riyaUrl);
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Remove from friends" }).click();
+
+  // Refused, and you stay put with the reason — the redirect must not fire on
+  // a removal that didn't happen.
+  await expect(page.getByText(/still share expenses/)).toBeVisible();
+  await expect(page).toHaveURL(riyaUrl);
+});
