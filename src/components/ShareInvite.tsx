@@ -1,14 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { resendInviteEmailAction } from "@/server/actions/invites";
+import { idleState } from "@/server/actions/types";
 
 /**
  * Getting an invite to somebody, in one compact row of icons.
  *
  * There is no SMS gateway behind this on purpose: sending SMS costs money
- * everywhere, and in India it also needs DLT registration. Instead the invite
- * is handed to apps the phone already has — WhatsApp addressed straight to
- * their number, the SMS composer, email, or the system share sheet.
+ * everywhere, and in India it also needs DLT registration. So WhatsApp, the SMS
+ * composer and the share sheet all hand the message to an app the phone already
+ * has, addressed to their number.
+ *
+ * Email is different: the server can already send it, so the envelope button
+ * sends it outright rather than opening a draft for you to write. It only falls
+ * back to a mailto: link when there is no mail server configured.
  */
 export function ShareInvite({
   link,
@@ -16,6 +22,8 @@ export function ShareInvite({
   phone,
   email,
   compact = false,
+  targetUserId,
+  canSendEmail = false,
 }: {
   link: string;
   name: string;
@@ -24,9 +32,16 @@ export function ShareInvite({
   email?: string | null;
   /** Hide the label row when the surrounding card already explains itself. */
   compact?: boolean;
+  /** Who the invite is for. Required for the server to send the email. */
+  targetUserId?: string;
+  /** True when this server has mail configured, so ✉ can send it directly. */
+  canSendEmail?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const [canShare, setCanShare] = useState(false);
+  const [sent, setSent] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [sending, startSending] = useTransition();
 
   useEffect(() => {
     setCanShare(typeof navigator !== "undefined" && typeof navigator.share === "function");
@@ -44,6 +59,22 @@ export function ShareInvite({
     }
     setCopied(true);
     setTimeout(() => setCopied(false), 1600);
+  }
+
+  function sendEmail() {
+    if (!targetUserId) return;
+    setSendError(null);
+    setSent(null);
+    startSending(async () => {
+      const payload = new FormData();
+      payload.append("targetUserId", targetUserId);
+      const result = await resendInviteEmailAction(idleState, payload);
+      if (result.error) {
+        setSendError(result.error);
+        return;
+      }
+      setSent(result.message ?? "Invite emailed.");
+    });
   }
 
   async function share() {
@@ -77,16 +108,25 @@ export function ShareInvite({
         💬
       </IconLink>
 
-      {email && (
-        <IconLink
-          href={`mailto:${email}?subject=${encodeURIComponent(
-            "Splitwise Killer",
-          )}&body=${encodeURIComponent(message)}`}
-          label={`Email ${email}`}
-        >
-          ✉️
-        </IconLink>
-      )}
+      {email &&
+        (canSendEmail && targetUserId ? (
+          <IconButton
+            onClick={sendEmail}
+            label={`Email the invite to ${email}`}
+            disabled={sending}
+          >
+            {sending ? "…" : sent ? "✓" : "✉️"}
+          </IconButton>
+        ) : (
+          <IconLink
+            href={`mailto:${email}?subject=${encodeURIComponent(
+              "Splitwise Killer",
+            )}&body=${encodeURIComponent(message)}`}
+            label={`Email ${email}`}
+          >
+            ✉️
+          </IconLink>
+        ))}
 
       {canShare && (
         <IconButton onClick={share} label="Share…">
@@ -99,6 +139,18 @@ export function ShareInvite({
       </IconButton>
 
       {copied && <span className="text-xs positive">Copied</span>}
+      {/* role="status" so the outcome of a send is announced, not just shown —
+          it is the only feedback that an email actually left. */}
+      {sent && (
+        <span role="status" className="text-xs positive">
+          {sent}
+        </span>
+      )}
+      {sendError && (
+        <span role="status" className="text-xs text-[var(--negative)]">
+          {sendError}
+        </span>
+      )}
     </div>
   );
 }
@@ -134,13 +186,22 @@ function IconButton({
   onClick,
   label,
   children,
+  disabled = false,
 }: {
   onClick: () => void;
   label: string;
   children: React.ReactNode;
+  disabled?: boolean;
 }) {
   return (
-    <button type="button" onClick={onClick} title={label} aria-label={label} className={ICON_CLASS}>
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      disabled={disabled}
+      className={`${ICON_CLASS} disabled:opacity-60`}
+    >
       {children}
     </button>
   );

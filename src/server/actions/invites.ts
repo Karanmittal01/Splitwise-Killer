@@ -7,6 +7,7 @@ import { requireUser } from "@/lib/session";
 import { recordActivity } from "@/lib/activity";
 import { PeopleError, ensureFriendship, mergeUsers } from "@/lib/people";
 import { emailConfigured, sendInviteEmail } from "@/lib/notify";
+import { recordAttempt, tooManyAttempts } from "@/lib/ratelimit";
 import { fail, succeed, type ActionState } from "./types";
 
 /**
@@ -115,11 +116,16 @@ export async function joinGroupByTokenAction(
   redirect(`/groups/${group.id}`);
 }
 
+const RESEND_LIMIT = 3;
+const RESEND_WINDOW_MS = 60 * 60 * 1000;
+
 /**
- * Email (or re-email) a pending invite.
+ * Email (or re-email) a pending invite, from the server.
  *
- * Useful when somebody was added before email delivery was configured, or when
- * the original message got lost.
+ * The alternative — a mailto: link — opens your own mail app with a draft you
+ * still have to write and send, which is a strange thing to ask when the app
+ * already has a working mail server behind it. This just sends it. Useful when
+ * somebody was added before email was configured, or the first one got lost.
  */
 export async function resendInviteEmailAction(
   _prev: ActionState,
@@ -144,18 +150,40 @@ export async function resendInviteEmailAction(
     select: { token: true, email: true, groupId: true },
   });
   if (!invite) return fail("There's no pending invite for that person.");
-  if (!invite.email) {
-    return fail("They were invited by mobile number, so there's no address to email. Copy the link instead.");
+
+  const target = await prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: { email: true, isPlaceholder: true },
+  });
+  if (target && !target.isPlaceholder) {
+    return fail("They've already signed in — there's nothing left to invite them to.");
   }
 
+  // Invited by number, then an email added later: the invite row has no address
+  // but the account does, and that address is just as good to send to.
+  const to = invite.email ?? target?.email ?? null;
+  if (!to) {
+    return fail(
+      "They were invited by mobile number, so there's no address to email. Send the link over WhatsApp instead.",
+    );
+  }
+
+  // One tap sends a real email to a real person. A few re-sends are reasonable
+  // — a stuck finger is not.
+  const key = `invite-email:${user.id}:${targetUserId}`;
+  if (tooManyAttempts(key, RESEND_LIMIT)) {
+    return fail("That invite has been emailed a few times already. Give it an hour, or send the link yourself.");
+  }
+  recordAttempt(key, RESEND_WINDOW_MS);
+
   const sent = await sendInviteEmail({
-    to: invite.email,
+    to,
     token: invite.token,
     inviterId: user.id,
     groupId: invite.groupId,
   });
 
   return sent
-    ? succeed(`Invite emailed to ${invite.email}.`)
+    ? succeed(`Invite emailed to ${to}.`)
     : fail("The email couldn't be sent. Check the Resend settings, or copy the link instead.");
 }

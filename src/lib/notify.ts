@@ -11,10 +11,14 @@ import { appUrl, inviteLink, verifyLink } from "./people";
  */
 export const emailConfigured = Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM);
 
+// Overridable so the delivery path can be pointed at a stub in tests, or at a
+// compatible relay if you self-host one. Defaults to Resend.
+const ENDPOINT = process.env.RESEND_API_URL ?? "https://api.resend.com/emails";
+
 async function send(to: string, subject: string, html: string): Promise<boolean> {
   if (!emailConfigured) return false;
   try {
-    const response = await fetch("https://api.resend.com/emails", {
+    const response = await fetch(ENDPOINT, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.RESEND_API_KEY}`,

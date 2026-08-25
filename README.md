@@ -45,6 +45,9 @@ Tailwind CSS v4
 - **Mobile invites go out over WhatsApp, SMS or the system share sheet** —
   addressed to that person's number, sent from your own phone. No SMS gateway,
   no per-message cost
+- **Email invites are sent by the server**, on adding somebody and again
+  whenever you tap ✉️ on their page — no half-written draft handed back to you
+  in your own mail app. Capped at a few re-sends an hour per person
 - **Private nicknames** for anybody on your list — only you see them, and their
   own name and picture update themselves when they sign in
 - **Import from your contacts**: the native picker on Android Chrome, or a
@@ -173,6 +176,7 @@ Set these environment variables:
 | `AUTH_URL` | your public URL, e.g. `https://split.karanmittal.com` |
 | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | from the step above |
 | `RESEND_API_KEY` / `RESEND_FROM` | optional, for invite emails |
+| `RESEND_API_URL` | optional; point mail delivery at a stub or your own relay |
 
 The build command (`prisma generate && prisma db push && next build`) creates
 the database tables for you on the first deploy, so there is nothing to run by

@@ -12,6 +12,7 @@ import { SubmitButton } from "@/components/form";
 import { prisma } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 import { inviteLink } from "@/lib/people";
+import { emailConfigured } from "@/lib/notify";
 import { getFriendPhotos, getNicknames, getSharedExpenses, userPairBalances } from "@/lib/queries";
 import { displayName, requireUser } from "@/lib/session";
 import { removeFriendAction } from "@/server/actions/friends";
@@ -152,7 +153,9 @@ export default async function FriendPage({ params }: { params: Promise<{ id: str
               <div className="min-w-0">
                 <p className="text-sm font-semibold">{name} hasn&apos;t signed in yet</p>
                 <p className="text-xs muted">
-                  Send them a link — they sign in with Google to see their share.
+                  {emailConfigured && (invite.email ?? person.email)
+                    ? "Tap ✉️ to email them the invite again, or send the link yourself."
+                    : "Send them a link — they sign in to see their share."}
                 </p>
               </div>
               <ShareInvite
@@ -160,6 +163,8 @@ export default async function FriendPage({ params }: { params: Promise<{ id: str
                 name={name}
                 phone={person.phone}
                 email={invite.email ?? person.email}
+                targetUserId={person.id}
+                canSendEmail={emailConfigured}
                 compact
               />
             </div>

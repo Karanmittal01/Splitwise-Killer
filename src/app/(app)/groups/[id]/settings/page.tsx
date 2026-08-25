@@ -18,7 +18,6 @@ import {
   resetInviteLinkAction,
   updateGroupAction,
 } from "@/server/actions/groups";
-import { resendInviteEmailAction } from "@/server/actions/invites";
 
 export const metadata = { title: "Group settings" };
 
@@ -193,20 +192,17 @@ export default async function GroupSettingsPage({ params }: { params: Promise<{ 
 
                   {invite && (
                     <div className="w-full">
+                      {/* The envelope sends the invite itself now, so the
+                          separate "email this invite" button it used to need
+                          is gone. */}
                       <ShareInvite
                         link={inviteLink(invite.token)}
                         name={displayName(member)}
                         phone={member.phone}
                         email={invite.email ?? member.email}
+                        targetUserId={member.id}
+                        canSendEmail={emailConfigured}
                       />
-                      {emailConfigured && invite.email && (
-                        <ActionForm action={resendInviteEmailAction} className="mt-2">
-                          <input type="hidden" name="targetUserId" value={member.id} />
-                          <SubmitButton className="btn btn-ghost text-xs" pendingLabel="Sending…">
-                            ✉️ Email this invite to {invite.email}
-                          </SubmitButton>
-                        </ActionForm>
-                      )}
                     </div>
                   )}
                 </div>
