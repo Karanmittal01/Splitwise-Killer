@@ -20,14 +20,11 @@ export function MobileMenu({
   email,
   image,
   userId,
-  showTools = false,
 }: {
   name: string;
   email: string | null;
   image: string | null;
   userId: string;
-  /** Passed down rather than derived here: OWNER_EMAIL is server-only. */
-  showTools?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -39,7 +36,6 @@ export function MobileMenu({
 
   const items: Item[] = [
     { href: "/notes", icon: "🗒️", label: "Personal notes" },
-    ...(showTools ? [{ href: "/tools", icon: "🛠️", label: "Tools" }] : []),
     { href: "/account", icon: "⚙️", label: "Account & appearance" },
     { href: "/contact", icon: "💬", label: "Contact & feedback" },
   ];

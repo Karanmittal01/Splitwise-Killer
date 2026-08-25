@@ -58,7 +58,6 @@ model User {
   feedback       Feedback[]
   friendshipsB   Friendship[]   @relation("FriendshipFriend")
   groupsCreated  Group[]        @relation("GroupCreatedBy")
-  shopwiseJobs   ShopwiseJob[]
 
   @@index([email])
   @@index([phone])
@@ -420,62 +419,4 @@ model Feedback {
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([createdAt])
-}
-
-// ---------------------------------------------------------------------------
-// Tools — Amex Shopwise gift card autobuy
-// ---------------------------------------------------------------------------
-
-enum ShopwiseJobStatus {
-  QUEUED
-  RUNNING
-  AWAITING_OTP
-  SUCCEEDED
-  DRY_RUN
-  FAILED
-  CANCELLED
-}
-
-/// One attempt at buying a gift card on the Amex Shopwise portal.
-///
-/// The purchase itself runs on a separate worker process, because driving a
-/// third-party checkout needs a real browser and several minutes of wall clock —
-/// neither of which a serverless request can provide. This table is the whole
-/// interface between the two: the app queues a row, the worker claims it, and
-/// the OTP you type here is handed over the same way.
-///
-/// Card details deliberately never appear in this model. They stay encrypted on
-/// the worker, so a database dump reveals what was bought and when, never how.
-model ShopwiseJob {
-  id     String            @id @default(cuid())
-  userId String
-  /// "live" spends money; "dry" stops at the cart.
-  mode   String            @default("dry")
-  status ShopwiseJobStatus @default(QUEUED)
-  /// Coarse progress from the worker, e.g. "logging-in", "verified", "paying".
-  phase  String?
-
-  /// Face value of the card, before the portal's convenience fee.
-  faceValueCents Int
-  /// What was actually charged, fee included — only known once the cart is read.
-  totalCents     Int?
-  feeCents       Int?
-  orderRef       String?
-  error          String?
-
-  /// The OTP relay. `otpCode` is written by you and cleared the moment the
-  /// worker reads it, so a code is never at rest for longer than a few seconds.
-  otpPurpose     String?
-  otpCode        String?
-  otpRequestedAt DateTime?
-
-  claimedAt  DateTime?
-  finishedAt DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([status, createdAt])
-  @@index([userId, createdAt])
 }
